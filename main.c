@@ -4,6 +4,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "container.h"
 #include "x86.h"
 
 static void startothers(void);
@@ -26,6 +27,7 @@ main(void)
   ioapicinit();    // another interrupt controller
   consoleinit();   // console hardware
   uartinit();      // serial port
+  cinit();         // container table
   pinit();         // process table
   tvinit();        // trap vectors
   binit();         // buffer cache

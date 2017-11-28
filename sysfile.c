@@ -238,7 +238,7 @@ bad:
   return -1;
 }
 
-static struct inode*
+struct inode*
 create(char *path, short type, short major, short minor)
 {
   uint off;
@@ -442,4 +442,69 @@ sys_pipe(void)
   fd[0] = fd0;
   fd[1] = fd1;
   return 0;
+}
+
+int
+sys_ccreate(void)
+{
+  // TODO: Validate arguments
+  //ccreate(char* name, char** progv, int progc, int mproc, uint msz, uint mdsk)
+  //        0             1             2            3         4           5
+
+  char *name, *path, *argv[MAXARG];
+  int i, progc, mproc;
+  uint uargv, uarg, msz, mdsk;
+
+  if(argstr(0, &name) < 0 || argint(2, &progc) < 0 || argint(3, &mproc) < 0 
+    || argint(4, (int*)&msz) < 0 || argint(5, (int*)&mdsk) < 0) {
+    cprintf("sys_ccreate: Error getting pointers\n");
+    return -1;
+  }
+
+  if(argstr(0, &path) < 0 || argint(1, (int*)&uargv) < 0){
+    return -1;
+  }
+  memset(argv, 0, sizeof(argv));
+  for(i=0;; i++){
+    if(i >= NELEM(argv))
+      return -1;
+    if(fetchint(uargv+4*i, (int*)&uarg) < 0)
+      return -1;
+    if(uarg == 0){
+      argv[i] = 0;
+      break;
+    }
+    if(fetchstr(uarg, &argv[i]) < 0)
+      return -1;
+  }
+
+  cprintf("sys_create\nuargv: %d\nname: %s\nmproc: %d\nmsz: %d\nmdsk: %d\n", uargv, name, mproc, msz, mdsk);
+  for (i = 0; i < progc; i++) 
+    cprintf("\t%s\n", argv[i]);
+  
+  return ccreate(name, argv, progc, mproc, msz, mdsk);
+}
+
+int
+sys_cstart(void)
+{
+  return 1;
+}
+
+int
+sys_cstop(void)
+{
+  return 1;
+}
+
+int
+sys_cinfo(void)
+{
+  return 1;
+}
+
+int
+sys_cpause(void)
+{
+  return 1;
 }

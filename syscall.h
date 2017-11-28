@@ -21,3 +21,8 @@
 #define SYS_mkdir  20
 #define SYS_close  21
 #define SYS_getticks 22
+#define SYS_ccreate  23
+#define SYS_cstop    24
+#define SYS_cstart   25
+#define SYS_cinfo    26
+#define SYS_cpause   27

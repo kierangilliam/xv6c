@@ -102,6 +102,14 @@ int             piperead(struct pipe*, char*, int);
 int             pipewrite(struct pipe*, char*, int);
 
 //PAGEBREAK: 16
+// sysfile.c
+struct inode* create(char *path, short type, short major, short minor);
+
+//container.c
+struct cont*    mycont();
+void            cinit(void);
+int 			ccreate (char*, char**, int, int, uint, uint);
+
 // proc.c
 int             cpuid(void);
 void            exit(void);

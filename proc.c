@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "container.h"
 
 struct {
   struct spinlock lock;
@@ -113,6 +114,7 @@ found:
   p->context->eip = (uint)forkret;
 
   p->ticks = 0;
+  p->cid = mycont()->cid;
 
   return p;
 }
@@ -143,6 +145,8 @@ userinit(void)
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
+
+  p->cid = ROOTCONT;
 
   // this assignment to p->state lets other cores
   // run this process. the acquire forces the above
