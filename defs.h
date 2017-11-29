@@ -107,6 +107,7 @@ struct inode* create(char *path, short type, short major, short minor);
 
 //container.c
 struct cont*    mycont();
+struct cont* 	rootcont();
 void            cinit(void);
 int 			ccreate (char*, char**, int, int, uint, uint);
 

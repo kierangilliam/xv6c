@@ -114,7 +114,7 @@ found:
   p->context->eip = (uint)forkret;
 
   p->ticks = 0;
-  p->cid = mycont()->cid;
+  p->cont = mycont();
 
   return p;
 }
@@ -146,7 +146,9 @@ userinit(void)
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
 
-  p->cid = ROOTCONT;
+  // Set initial process's cont to root
+  p->cont = rootcont();
+  rootcont()->ptable 
 
   // this assignment to p->state lets other cores
   // run this process. the acquire forces the above

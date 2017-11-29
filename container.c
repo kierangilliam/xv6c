@@ -29,6 +29,16 @@ mycont(void) {
 	return &currcont;
 }
 
+struct cont* 	
+rootcont(void) {
+	struct cont *c;
+	// TODO: Check to make sure it always inits at first index
+  	acquire(&ctable.lock);  
+  	c = &ctable.cont[0];
+  	release(&ctable.lock);
+  	return c;
+}
+
 // Look in the container table for an CUNUSED cont.
 // If found, change state to CEMBRYO
 // Otherwise return 0.
@@ -140,6 +150,8 @@ ccreate(char* name, char* progv[MAXARG], int progc, int mproc, uint msz, uint md
 	nc->msz = msz;
 	nc->mdsk = mdsk;
 	nc->rootdir = rootdir;
+	nc->procs = malloc(sizeof(struct proc *) * mproc);
+	// TODO: Possibly malloc each proc? and set to unused like normal ptable?
 	strncpy(nc->name, name, 16);
 	nc->state = CRUNNABLE;	
 	release(&ctable.lock);	

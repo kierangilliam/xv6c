@@ -2,7 +2,7 @@
 #include "stat.h"
 #include "user.h"
 #include "param.h"
-//#include "fcntl.h" // RDOWNLY
+#include "fcntl.h" 
 
 #define CONT_MAX_MEM  1024
 #define CONT_MAX_PROC 8
@@ -13,6 +13,39 @@ usage(char* usage)
 {
     printf(1, "usage: ctool %s\n", usage);
     exit();
+}
+
+// Modified implementation of 
+// https://stackoverflow.com/
+// questions/33792754/
+// in-c-on-linux-how-would-you-implement-cp
+int
+cp(char* dst, char* file)
+{  
+  char buffer[1024];
+  int files[2];
+  int count;
+  int pathsize = sizeof(dst) + sizeof(file) + 2; // dst.len + '\' + src.len + \0
+  char path[pathsize]; 
+
+  memmove(path, dst, strlen(file));
+  memmove(path + strlen(dst), "/", 1);
+  memmove(path + strlen(dst) + 1, file, strlen(file));
+  memmove(path + strlen(dst) + 1 + strlen(file), "\0", 1);
+
+  files[0] = open(file, O_RDONLY);
+  if (files[0] == -1) // Check if file opened 
+      return -1;
+  files[1] = open(path, O_WRONLY | O_CREATE);
+  if (files[1] == -1) { // Check if file opened (permissions problems ...) 
+      close(files[0]);
+      return -1;
+  }
+
+  while ((count = read(files[0], buffer, sizeof(buffer))) != 0)
+      write(files[1], buffer, count);
+
+  return 1;
 }
 
 int
@@ -31,7 +64,7 @@ void
 create(int argc, char *argv[])
 {
   char *progv[32];
-  int i, last_flag, progc, 
+  int i, k, progc, last_flag = 2, // No flags
   mproc = CONT_MAX_PROC, 
   msz = CONT_MAX_MEM, 
   mdsk = CONT_MAX_DISK;  
@@ -39,7 +72,6 @@ create(int argc, char *argv[])
   if (argc < 4)
     usage("create <name> [-p <max_processes>] [-m <max_memory>] [-d <max_disk>] prog [prog2.. ]");
 
-  last_flag = 2; // No flags
 
   for (i = 0; i < argc; i++) {
     if (strcmp(argv[i], "-p") == 0) {
@@ -56,23 +88,18 @@ create(int argc, char *argv[])
     }
   }
 
-  printf(1, "argc: %d, last_flag: %d\n", argc, last_flag);
   progc = argc - last_flag - 1;
-
-//  *progv = malloc(progc * sizeof(char*));
-
-  int k;
-
-  //progv = malloc(sizeof(char*) * progc);
 
   for (i = last_flag + 1, k = 0; i < argc; i++, k++) {
     printf(1, "%s", argv[i]);
+
+    // TODO: move this into the kernel or the rest of ccreate out of the kernel
+    cp(argv[2], argv[i]);
     
-    progv[k] = malloc(sizeof(argv[i]));
-    memmove(progv[k], argv[i], sizeof(argv[i]));
-    memmove(progv[k] + sizeof(argv[i]), "\0", 1);
-    printf(1, "\t%s\n", progv[k]);
-  }
+    // If we were using kernel for ccreate sys call
+    progv[k] = malloc(sizeof(argv[i])); memmove(progv[k], argv[i], sizeof(argv[i])); memmove(progv[k] + sizeof(argv[i]), "\0", 1); printf(1, "\t%s\n", progv[k]);
+  }  
+
 
   printf(1, "name: %s\nmproc: %d\nmsz: %d\nmdsk: %d\nprogc: %d\n", argv[2], mproc, msz, mdsk, progc);
 
@@ -83,35 +110,36 @@ create(int argc, char *argv[])
   }
 }
 
+// ctool start <name> prog arg1 [arg2 ...]
+// ctool start c1 echoloop ab
 void
 start(int argc, char *argv[])
-{
-  // ctool start vc0 c1 sh
-                  // (optional) max proc, max mb of memory, max disk space   
-  // ctool start vc0 c1 sh 8 10 5  
-  // ctool start <name> prog arg1 [arg2 ...]
+{    
+
+  if (argc < 4)
+    usage("ctool start <name> prog arg1 [arg2 ...]");
 }
 
 void
-pause()
-{
-  
-}
-
-void
-resume()
+pause(int argc, char *argv[])
 {
   
 }
 
 void
-stop()
+resume(int argc, char *argv[])
 {
   
 }
 
 void
-info()
+stop(int argc, char *argv[])
+{
+  
+}
+
+void
+info(int argc, char *argv[])
 {
   
 }
