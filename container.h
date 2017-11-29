@@ -13,11 +13,6 @@ struct cpu {
 extern struct cpu cpus[NCPU];
 extern int ncpu;
 
-#define ROOTCONT       1
-#define MAX_CONT_MEM   4096
-#define MAX_CONT_DSK   4096
-#define MAX_CONT_PROC  64
-
 enum contstate { CUNUSED, CEMBRYO, CRUNNABLE, CPAUSED, CRUNNING };
 
 // TODO: maybe remove cid?

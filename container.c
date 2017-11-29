@@ -229,7 +229,8 @@ scheduler(void)
     sti();
 
     // Loop over process table looking for process to run.
-    acquirectable();
+    acquire(&ptable.lock);
+    // TODO: do we need to acquire ctable lock too?
 
 	// TODO: Check that scheulde cycles over ctable equally    
     for(i = 0; i < NCONT; i++) {
@@ -263,7 +264,7 @@ scheduler(void)
 	      c->proc = 0;
 	  }
     }
-    releasectable();
+    release(&ptable.lock);
 
   }
 }
@@ -353,8 +354,6 @@ ccreate(char* name, char* progv[MAXARG], int progc, int mproc, uint msz, uint md
 	nc->msz = msz;
 	nc->mdsk = mdsk;
 	nc->rootdir = rootdir;
-	cprintf("This will def crash\n");
-	//nc->ptable = malloc(sizeof(struct proc *) * mproc);
 	strncpy(nc->name, name, 16);
 	nc->state = CRUNNABLE;	
 	release(&ctable.lock);	
@@ -362,16 +361,43 @@ ccreate(char* name, char* progv[MAXARG], int progc, int mproc, uint msz, uint md
 	return 1;  
 }
 
-void
-cstart(char* name, int argc, char** argv) 
-{
-	// Attach to a vc 
-	// argv is program plus arguments
+// Allocates a process for the table "name"
+// Runs argv[0] (argv is program plus arguments)
+int
+cstart(char* name, char** argv, int argc) 
+{	
+	struct cont *c;
+	int i;
+
+	// Find container
+	acquire(&ctable.lock);
+
+	for (i = 0; i < NCONT; i++) {
+		c = &ctable.cont[i];
+		if (strcmp(name, c->name) == 0)
+			goto found;
+	}
+
+	release(&ctable.lock);
+	return -1;
+
+found:
+
 	// Check if RUNNABLE
-	// <name> prog arg1 [arg2 ...]
-	// acquire(&ctable.lock);
-	// nc->state = CRUNNING;		
-	// release(&ctable.lock);	
+	if (c->state != CRUNNABLE) {
+		release(&ctable.lock);	
+		return -1;
+	}
+	
+	// allocproc
+	// Exec procecess
+	// Attach to a vc
+	
+	c->state = CRUNNING;	
+
+	release(&ctable.lock);	
+	
+	return 1;
 }
 
 

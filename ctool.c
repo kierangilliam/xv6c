@@ -4,10 +4,6 @@
 #include "param.h"
 #include "fcntl.h" 
 
-#define CONT_MAX_MEM  1024
-#define CONT_MAX_PROC 8
-#define CONT_MAX_DISK 1024
-
 // TODO: Clean up tab space formatting of modified files
 // TODO: Rewrite comments on proc.c, comment container.c
 
@@ -28,7 +24,7 @@ cp(char* dst, char* file)
   char buffer[1024];
   int files[2];
   int count;
-  int pathsize = strlen(dst) + strlen(file) + 2; // dst.len + '\' + src.len + \0
+  int pathsize = strlen(dst) + strlen(file) + 2; // './' dst.len + '/' + src.len + \0
   char path[pathsize]; 
 
   memmove(path, dst, strlen(dst));
@@ -36,13 +32,13 @@ cp(char* dst, char* file)
   memmove(path + strlen(dst) + 1, file, strlen(file));
   memmove(path + strlen(dst) + 1 + strlen(file), "\0", 1);
 
-  printf(1, "path created %s\n", path);
-
   files[0] = open(file, O_RDONLY);
   if (files[0] == -1) // Check if file opened 
       return -1;
+  
   files[1] = open(path, O_WRONLY | O_CREATE);
   if (files[1] == -1) { // Check if file opened (permissions problems ...) 
+    printf(1, "failed to create file |%s|\n", path);
       close(files[0]);
       return -1;
   }
@@ -62,17 +58,17 @@ max(int a, int b)
     return b;
 }
 
-// ctool create ctest1 -p 4 sh ps cat echo
+// ctool create ctest1 -p 4 sh ps cat echoloop
 // folder/ container name, what to copy into folder
 // mkdir, cp file 1, cp file n  
 void
 create(int argc, char *argv[])
 {
-  char *progv[32];
+  char *progv[MAXARG];
   int i, k, progc, last_flag = 2, // No flags
-  mproc = CONT_MAX_PROC, 
-  msz = CONT_MAX_MEM, 
-  mdsk = CONT_MAX_DISK;  
+  mproc = MAX_CONT_PROC, 
+  msz = MAX_CONT_MEM, 
+  mdsk = MAX_CONT_DSK;  
 
   if (argc < 4)
     usage("create <name> [-p <max_processes>] [-m <max_memory>] [-d <max_disk>] prog [prog2.. ]");
@@ -95,16 +91,6 @@ create(int argc, char *argv[])
 
   progc = argc - last_flag - 1;
 
-  for (i = last_flag + 1, k = 0; i < argc; i++, k++) {
-    printf(1, "%s", argv[i]);
-
-    // TODO: move this into the kernel or the rest of ccreate out of the kernel
-    cp(argv[2], argv[i]);
-    
-    // If we were using kernel for ccreate sys call
-    progv[k] = malloc(sizeof(argv[i])); memmove(progv[k], argv[i], sizeof(argv[i])); memmove(progv[k] + sizeof(argv[i]), "\0", 1); printf(1, "\t%s\n", progv[k]);
-  }  
-
 
   printf(1, "name: %s\nmproc: %d\nmsz: %d\nmdsk: %d\nprogc: %d\n", argv[2], mproc, msz, mdsk, progc);
 
@@ -113,16 +99,39 @@ create(int argc, char *argv[])
   } else {
     printf(1, "Failed to create container %s\n", argv[2]); 
   }
+
+  for (i = last_flag + 1, k = 0; i < argc; i++, k++) {
+
+    // TODO: move this into the kernel or the rest of ccreate out of the kernel
+    if (cp(argv[2], argv[i]) != 1) 
+      printf(1, "Failed to copy %s into folder %s. Continuing...\n", argv[i], argv[2]);
+    
+    // If we were using kernel for ccreate sys call
+    // Change size of to strlen
+    // progv[k] = malloc(sizeof(argv[i])); memmove(progv[k], argv[i], sizeof(argv[i])); memmove(progv[k] + sizeof(argv[i]), "\0", 1); printf(1, "\t%s\n", progv[k]);
+  }  
 }
 
 // ctool start <name> prog arg1 [arg2 ...]
-// ctool start c1 echoloop ab
+// ctool start ctest1 echoloop ab
 void
 start(int argc, char *argv[])
 {    
 
+  char *args[MAXARG];
+  int i, k;
+
   if (argc < 4)
     usage("ctool start <name> prog arg1 [arg2 ...]");
+
+  for (i = 3, k = 0; i < argc; i++, k++) {
+    args[k] = malloc(strlen(argv[i]) + 1);     
+    memmove(args[k], argv[i], strlen(argv[i])); 
+    memmove(args[k] + strlen(argv[i]), "\0", 1);
+  }
+
+  if (cstart(argv[2], args, (argc - 3)) != 1) 
+    printf(1, "Failed to start container %s\n", argv[2]);     
 }
 
 void

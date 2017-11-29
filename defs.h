@@ -118,7 +118,8 @@ struct cont* 	 rootcont(void);
 void             cinit(void);
 void             scheduler(void) __attribute__((noreturn));
 void             sched(void);
-int 			 ccreate (char*, char**, int, int, uint, uint);
+int 			 ccreate(char*, char**, int, int, uint, uint);
+int 			 cstart(char*, char**, int);
 
 // proc.c
 void			initprocess(void);

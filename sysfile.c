@@ -378,11 +378,14 @@ sys_chdir(void)
   
   begin_op();
   if(argstr(0, &path) < 0 || (ip = namei(path)) == 0){
+    cprintf("cant pick up path\n");
     end_op();
     return -1;
   }
   ilock(ip);
   if(ip->type != T_DIR){
+    // TODO: REMOVE
+    cprintf("not a dir\n");
     iunlockput(ip);
     end_op();
     return -1;
@@ -451,7 +454,7 @@ sys_ccreate(void)
   //ccreate(char* name, char** progv, int progc, int mproc, uint msz, uint mdsk)
   //        0             1             2            3         4           5
 
-  char *name, *path, *argv[MAXARG];
+  char *name, *argv[MAXARG];
   int i, progc, mproc;
   uint uargv, uarg, msz, mdsk;
 
@@ -461,7 +464,7 @@ sys_ccreate(void)
     return -1;
   }
 
-  if(argstr(0, &path) < 0 || argint(1, (int*)&uargv) < 0){
+  if(argint(1, (int*)&uargv) < 0){
     return -1;
   }
   memset(argv, 0, sizeof(argv));
@@ -488,7 +491,41 @@ sys_ccreate(void)
 int
 sys_cstart(void)
 {
-  return 1;
+  // TODO: Validate arguments (like argc is < MAXARG)
+  // cstart(char* name, char** argv, int argc)
+  //          0             1         2   
+
+  char *name, *prog, *argv[MAXARG];
+  int i, argc;
+  uint uargv, uarg;
+
+  if(argstr(0, &name) < 0 || argstr(1, &prog) < 0 || argint(2, &argc) < 0) {
+    cprintf("sys_ccreate: Error getting pointers\n");
+    return -1;
+  }
+
+  if(argint(1, (int*)&uargv) < 0){
+    return -1;
+  }
+  memset(argv, 0, sizeof(argv));
+  for(i=0;; i++){
+    if(i >= NELEM(argv))
+      return -1;
+    if(fetchint(uargv+4*i, (int*)&uarg) < 0)
+      return -1;
+    if(uarg == 0){
+      argv[i] = 0;
+      break;
+    }
+    if(fetchstr(uarg, &argv[i]) < 0)
+      return -1;
+  }
+
+  cprintf("sys_cstart\nuargv: %d\nname: %s\nargc: %d\n", uargv, name, argc);
+  for (i = 0; i < argc; i++) 
+    cprintf("\t%s\n", argv[i]);
+  
+  return cstart(name, argv, argc);
 }
 
 int
