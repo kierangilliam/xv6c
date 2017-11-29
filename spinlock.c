@@ -6,7 +6,7 @@
 #include "x86.h"
 #include "memlayout.h"
 #include "mmu.h"
-#include "proc.h"
+#include "container.h"
 #include "spinlock.h"
 
 void

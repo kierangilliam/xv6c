@@ -8,6 +8,9 @@
 #define CONT_MAX_PROC 8
 #define CONT_MAX_DISK 1024
 
+// TODO: Clean up tab space formatting of modified files
+// TODO: Rewrite comments on proc.c, comment container.c
+
 void 
 usage(char* usage) 
 {
@@ -25,13 +28,15 @@ cp(char* dst, char* file)
   char buffer[1024];
   int files[2];
   int count;
-  int pathsize = sizeof(dst) + sizeof(file) + 2; // dst.len + '\' + src.len + \0
+  int pathsize = strlen(dst) + strlen(file) + 2; // dst.len + '\' + src.len + \0
   char path[pathsize]; 
 
-  memmove(path, dst, strlen(file));
+  memmove(path, dst, strlen(dst));
   memmove(path + strlen(dst), "/", 1);
   memmove(path + strlen(dst) + 1, file, strlen(file));
   memmove(path + strlen(dst) + 1 + strlen(file), "\0", 1);
+
+  printf(1, "path created %s\n", path);
 
   files[0] = open(file, O_RDONLY);
   if (files[0] == -1) // Check if file opened 

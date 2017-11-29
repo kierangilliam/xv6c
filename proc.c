@@ -8,11 +8,6 @@
 #include "spinlock.h"
 #include "container.h"
 
-struct {
-  struct spinlock lock;
-  struct proc proc[NPROC];
-} ptable;
-
 static struct proc *initproc;
 
 int nextpid = 1;
@@ -20,38 +15,6 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
-
-void
-pinit(void)
-{
-  initlock(&ptable.lock, "ptable");
-}
-
-// Must be called with interrupts disabled
-int
-cpuid() {
-  return mycpu()-cpus;
-}
-
-// Must be called with interrupts disabled to avoid the caller being
-// rescheduled between reading lapicid and running through the loop.
-struct cpu*
-mycpu(void)
-{
-  int apicid, i;
-  
-  if(readeflags()&FL_IF)
-    panic("mycpu called with interrupts enabled\n");
-  
-  apicid = lapicid();
-  // APIC IDs are not guaranteed to be contiguous. Maybe we should have
-  // a reverse map, or reserve a register to store &cpus[i].
-  for (i = 0; i < ncpu; ++i) {
-    if (cpus[i].apicid == apicid)
-      return &cpus[i];
-  }
-  panic("unknown apicid\n");
-}
 
 // Disable interrupts so that we are not rescheduled
 // while reading proc from the cpu structure
@@ -72,25 +35,30 @@ myproc(void) {
 // state required to run in the kernel.
 // Otherwise return 0.
 static struct proc*
-allocproc(void)
+allocproc(struct cont *parentcont)
 {
   struct proc *p;
   char *sp;
+  struct proc *ptable;
+  int nproc;
 
-  acquire(&ptable.lock);
+  acquirectable();
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  ptable = parentcont->ptable;
+  nproc = parentcont->mproc;
+
+  for(p = ptable; p < &ptable[nproc]; p++) 
     if(p->state == UNUSED)
-      goto found;
+      goto found;  
 
-  release(&ptable.lock);
+  releasectable();
   return 0;
 
 found:
   p->state = EMBRYO;
-  p->pid = nextpid++;
+  p->pid = nextpid++;  
 
-  release(&ptable.lock);
+  releasectable();  
 
   // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
@@ -114,20 +82,21 @@ found:
   p->context->eip = (uint)forkret;
 
   p->ticks = 0;
-  p->cont = mycont();
+  p->cont = parentcont;
+
+  procdump();
 
   return p;
 }
 
-//PAGEBREAK: 32
 // Set up first user process.
 void
-userinit(void)
+initprocess(void)
 {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
-  p = allocproc();
+  p = allocproc(rootcont());
   
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
@@ -148,17 +117,16 @@ userinit(void)
 
   // Set initial process's cont to root
   p->cont = rootcont();
-  rootcont()->ptable 
 
   // this assignment to p->state lets other cores
   // run this process. the acquire forces the above
   // writes to be visible, and the lock is also needed
   // because the assignment might not be atomic.
-  acquire(&ptable.lock);
+  acquirectable();
 
   p->state = RUNNABLE;
 
-  release(&ptable.lock);
+  releasectable();
 }
 
 // Grow current process's memory by n bytes.
@@ -193,7 +161,7 @@ fork(void)
   struct proc *curproc = myproc();
 
   // Allocate process.
-  if((np = allocproc()) == 0){
+  if((np = allocproc(curproc->cont)) == 0){
     return -1;
   }
 
@@ -220,11 +188,11 @@ fork(void)
 
   pid = np->pid;
 
-  acquire(&ptable.lock);
+  acquirectable();
 
   np->state = RUNNABLE;
 
-  release(&ptable.lock);
+  releasectable();
 
   return pid;
 }
@@ -237,7 +205,8 @@ exit(void)
 {
   struct proc *curproc = myproc();
   struct proc *p;
-  int fd;
+  struct proc *ptable;
+  int fd, nproc;
 
   if(curproc == initproc)
     panic("init exiting");
@@ -255,13 +224,16 @@ exit(void)
   end_op();
   curproc->cwd = 0;
 
-  acquire(&ptable.lock);
+  acquirectable();
+
+  ptable = curproc->cont->ptable;
+  nproc = curproc->cont->mproc;
 
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
 
   // Pass abandoned children to init.
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  for(p = ptable; p < &ptable[nproc]; p++){
     if(p->parent == curproc){
       p->parent = initproc;
       if(p->state == ZOMBIE)
@@ -281,14 +253,19 @@ int
 wait(void)
 {
   struct proc *p;
-  int havekids, pid;
+  struct proc *ptable;
+  int havekids, pid, nproc;
   struct proc *curproc = myproc();
   
-  acquire(&ptable.lock);
+  acquirectable();
+
+  ptable = curproc->cont->ptable;
+  nproc = curproc->cont->mproc;
+
   for(;;){
     // Scan through table looking for exited children.
     havekids = 0;
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    for(p = ptable; p < &ptable[nproc]; p++){
       if(p->parent != curproc)
         continue;
       havekids = 1;
@@ -303,100 +280,30 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
-        release(&ptable.lock);
+        releasectable();
         return pid;
       }
     }
 
     // No point waiting if we don't have any children.
     if(!havekids || curproc->killed){
-      release(&ptable.lock);
+      releasectable();
       return -1;
     }
 
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
-    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+    sleep(curproc, ctablelock());  //DOC: wait-sleep
   }
-}
-
-//PAGEBREAK: 42
-// Per-CPU process scheduler.
-// Each CPU calls scheduler() after setting itself up.
-// Scheduler never returns.  It loops, doing:
-//  - choose a process to run
-//  - swtch to start running that process
-//  - eventually that process transfers control
-//      via swtch back to the scheduler.
-void
-scheduler(void)
-{
-  struct proc *p;
-  struct cpu *c = mycpu();
-  c->proc = 0;
-  
-  for(;;){
-    // Enable interrupts on this processor.
-    sti();
-
-    // Loop over process table looking for process to run.
-    acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
-    release(&ptable.lock);
-
-  }
-}
-
-// Enter scheduler.  Must hold only ptable.lock
-// and have changed proc->state. Saves and restores
-// intena because intena is a property of this
-// kernel thread, not this CPU. It should
-// be proc->intena and proc->ncli, but that would
-// break in the few places where a lock is held but
-// there's no process.
-void
-sched(void)
-{
-  int intena;
-  struct proc *p = myproc();
-
-  if(!holding(&ptable.lock))
-    panic("sched ptable.lock");
-  if(mycpu()->ncli != 1)
-    panic("sched locks");
-  if(p->state == RUNNING)
-    panic("sched running");
-  if(readeflags()&FL_IF)
-    panic("sched interruptible");
-  intena = mycpu()->intena;
-  swtch(&p->context, mycpu()->scheduler);
-  mycpu()->intena = intena;
 }
 
 // Give up the CPU for one scheduling round.
 void
 yield(void)
 {
-  acquire(&ptable.lock);  //DOC: yieldlock
+  acquirectable();  //DOC: yieldlock
   myproc()->state = RUNNABLE;
   sched();
-  release(&ptable.lock);
+  releasectable();
 }
 
 // A fork child's very first scheduling by scheduler()
@@ -405,8 +312,8 @@ void
 forkret(void)
 {
   static int first = 1;
-  // Still holding ptable.lock from scheduler.
-  release(&ptable.lock);
+  // Still holding ctablelock from scheduler.
+  releasectable();
 
   if (first) {
     // Some initialization functions must be run in the context
@@ -431,21 +338,23 @@ sleep(void *chan, struct spinlock *lk)
     panic("sleep");
 
   if(lk == 0)
-    panic("sleep without lk");
+    panic("sleep without lk");  
 
-  // Must acquire ptable.lock in order to
+  // Must acquire ctable.lock in order to
   // change p->state and then call sched.
-  // Once we hold ptable.lock, we can be
+  // Once we hold ctable.lock, we can be
   // guaranteed that we won't miss any wakeup
-  // (wakeup runs with ptable.lock locked),
+  // (wakeup runs with ctable.lock locked),
   // so it's okay to release lk.
-  if(lk != &ptable.lock){  //DOC: sleeplock0
-    acquire(&ptable.lock);  //DOC: sleeplock1
+  if(lk != ctablelock()){  //DOC: sleeplock0
+    acquirectable();  //DOC: sleeplock1
     release(lk);
   }
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
+
+  //cprintf("Sleeping %s\n", p->name);
 
   sched();
 
@@ -453,32 +362,41 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = 0;
 
   // Reacquire original lock.
-  if(lk != &ptable.lock){  //DOC: sleeplock2
-    release(&ptable.lock);
+  if(lk != ctablelock()){  //DOC: sleeplock2
+    releasectable();
     acquire(lk);
   }
 }
 
 //PAGEBREAK!
 // Wake up all processes sleeping on chan.
-// The ptable lock must be held.
+// The ctable lock must be held.
 static void
 wakeup1(void *chan)
 {
   struct proc *p;
+  struct proc *ptable;
+  int nproc;
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+  //cprintf("May not work, may have to wake up all containers processes\n");
+
+  nproc = mycont()->mproc;
+  ptable = mycont()->ptable;
+
+  for(p = ptable; p < &ptable[nproc]; p++)
+    if(p->state == SLEEPING && p->chan == chan) {
+      //cprintf("Waking up: %s\n", p->name);
       p->state = RUNNABLE;
+    }
 }
 
 // Wake up all processes sleeping on chan.
 void
 wakeup(void *chan)
 {
-  acquire(&ptable.lock);
+  acquirectable();
   wakeup1(chan);
-  release(&ptable.lock);
+  releasectable();
 }
 
 // Kill the process with the given pid.
@@ -488,24 +406,30 @@ int
 kill(int pid)
 {
   struct proc *p;
+  struct proc *ptable;
+  int nproc;
 
-  acquire(&ptable.lock);
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  acquirectable();
+
+  ptable = myproc()->cont->ptable;
+  nproc = myproc()->cont->mproc;
+
+  for(p = ptable; p < &ptable[nproc]; p++){
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
         p->state = RUNNABLE;
-      release(&ptable.lock);
+      releasectable();
       return 0;
     }
   }
-  release(&ptable.lock);
+  releasectable();
   return -1;
 }
 
 //PAGEBREAK: 36
-// Print a process listing to console.  For debugging.
+// Print a process listing of current container to console.  For debugging.
 // Runs when user types ^P on console.
 // No lock to avoid wedging a stuck machine further.
 void
@@ -524,14 +448,24 @@ procdump(void)
   char *state;
   uint pc[10];
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  struct proc *ptable;
+  int nproc;
+
+  acquirectable();
+
+  nproc = mycont()->mproc;
+  ptable = mycont()->ptable;
+
+  cprintf("procdump() nproc: %d\n", nproc);
+
+  for(p = ptable; p < &ptable[nproc]; p++){
     if(p->state == UNUSED)
       continue;
     if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
       state = states[p->state];
     else
       state = "???";
-    cprintf("%d %s %s", p->pid, state, p->name);
+    cprintf("cid: %d. %d %s %s", p->cont->cid, p->pid, state, p->name);
     if(p->state == SLEEPING){
       getcallerpcs((uint*)p->context->ebp+2, pc);
       for(i=0; i<10 && pc[i] != 0; i++)
@@ -539,4 +473,6 @@ procdump(void)
     }
     cprintf("\n");
   }
+
+  releasectable();
 }

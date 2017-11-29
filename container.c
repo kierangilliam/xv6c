@@ -1,32 +1,149 @@
 #include "types.h"
 #include "defs.h"
-#include "container.h"
 #include "spinlock.h"
 #include "param.h"
 #include "stat.h"
-//#include "memlayout.h"
-//#include "mmu.h"
-//#include "x86.h"
+#include "memlayout.h"
+#include "mmu.h"
+#include "x86.h"
+#include "container.h"
+#include "proc.h"
+
+
+static struct cont* alloccont(void);
+
+// TODO: Check to make sure ALL ctable calls have a lock
+
+// Must be called with interrupts disabled
+int
+cpuid() {
+  return mycpu()-cpus;
+}
+
+// Must be called with interrupts disabled to avoid the caller being
+// rescheduled between reading lapicid and running through the loop.
+struct cpu*
+mycpu(void)
+{
+  int apicid, i;
+  
+  if(readeflags()&FL_IF)
+    panic("mycpu called with interrupts enabled\n");
+  
+  apicid = lapicid();
+  // APIC IDs are not guaranteed to be contiguous. Maybe we should have
+  // a reverse map, or reserve a register to store &cpus[i].
+  for (i = 0; i < ncpu; ++i) {
+    if (cpus[i].apicid == apicid)
+      return &cpus[i];
+  }
+  panic("unknown apicid\n");
+}
 
 struct {
   struct spinlock lock;
   struct cont cont[NCONT];
 } ctable;
 
-struct cont currcont;
+struct {
+	struct spinlock lock;
+	struct proc proc[NCONT][NPROC];
+} ptable; 
+
+struct cont *currcont;
 
 int nextcid = 1;
 
-// TODO: call this somewhere
 void
 cinit(void)
 {
   initlock(&ctable.lock, "ctable");
+  // TODO: Remove
+  contdump();
+}
+
+void
+acquirectable(void) 
+{
+	//cprintf("\t\tWaiting on acquiring ctable...\n");
+	acquire(&ptable.lock);
+	//cprintf("\t\tGot ctable\n");
+}
+// TODO: refactor name of ctablelock to ptable
+// TODO: replace these aqcuires and releases with normal aqcuire and release using ctablelock()
+void 
+releasectable(void)
+{
+	release(&ptable.lock);
+	//cprintf("\t\t Released ctable\n");
+}
+
+struct spinlock*
+ctablelock(void)
+{
+	return &ptable.lock;
+}
+
+void
+initcontainer(void)
+{
+	int i,
+		mproc = MAX_CONT_PROC,
+		msz   = MAX_CONT_MEM,
+		mdsk  = MAX_CONT_DSK;
+	struct cont *c;
+
+	if ((c = alloccont()) == 0) {
+		panic("Can't alloc init container.");
+	}
+
+	currcont = c;	
+
+	acquire(&ctable.lock);
+	c->mproc = mproc;
+	c->msz = msz;
+	c->mdsk = mdsk;	
+	c->state = CRUNNABLE;	
+	c->rootdir = namei("/");
+	safestrcpy(c->name, "initcont", sizeof(c->name));	
+
+	// Init pointers to each container's process tables
+	for (i = 0; i < NCONT; i++)
+		ctable.cont[i].ptable = ptable.proc[i];
+
+	release(&ctable.lock);	
+}
+
+// Set up first user container and process.
+void
+userinit(void)
+{
+  initcontainer();
+  initprocess();  
+  cprintf("init process\n");
+}
+
+void
+contdump(void)
+{
+	static char *states[] = {
+	  [CUNUSED]    "unused",
+	  [CRUNNING]   "running",
+	  [CPAUSED]    "paused",
+	  [CRUNNABLE]  "runnable",
+	  [CEMBRYO]    "embryo"
+	  };
+	int i;
+  
+  	acquire(&ctable.lock);
+  	for (i = 0; i < NCONT; i++)
+  		cprintf("container %d: %s\n", ctable.cont[i].cid, states[ctable.cont[i].state]);
+  	release(&ctable.lock);
 }
 
 struct cont*
 mycont(void) {
-	return &currcont;
+	return currcont;
 }
 
 struct cont* 	
@@ -50,8 +167,8 @@ alloccont(void)
 	acquire(&ctable.lock);
 
 	for(c = ctable.cont; c < &ctable.cont[NCONT]; c++)
-	if(c->state == CUNUSED)
-	  goto found;
+		if(c->state == CUNUSED)
+		  goto found;
 
 	release(&ctable.lock);
 	return 0;
@@ -63,6 +180,92 @@ found:
 	release(&ctable.lock);
 
 	return c;
+}
+
+// Enter scheduler.  Must hold only ctable.lock
+// and have changed proc->state. Saves and restores
+// intena because intena is a property of this
+// kernel thread, not this CPU. It should
+// be proc->intena and proc->ncli, but that would
+// break in the few places where a lock is held but
+// there's no process.
+void
+sched(void)
+{
+  int intena;
+  struct proc *p = myproc();
+
+  if(!holding(ctablelock()))
+    panic("sched ctable.lock");
+  if(mycpu()->ncli != 1)
+    panic("sched locks");
+  if(p->state == RUNNING)
+    panic("sched running");
+  if(readeflags()&FL_IF)
+    panic("sched interruptible");
+  intena = mycpu()->intena;
+  swtch(&p->context, mycpu()->scheduler);
+  mycpu()->intena = intena;
+}
+
+// Per-CPU process scheduler.
+// Each CPU calls scheduler() after setting itself up.
+// Scheduler never returns.  It loops, doing:
+//  - choose a process to run
+//  - swtch to start running that process
+//  - eventually that process transfers control
+//      via swtch back to the scheduler.
+void
+scheduler(void)
+{
+  struct proc *p;
+  struct cont *cont;
+  struct cpu *c = mycpu();
+  int i, k;
+  c->proc = 0;
+  
+  for(;;){
+    // Enable interrupts on this processor.
+    sti();
+
+    // Loop over process table looking for process to run.
+    acquirectable();
+
+	// TODO: Check that scheulde cycles over ctable equally    
+    for(i = 0; i < NCONT; i++) {
+
+      cont = &ctable.cont[i];
+
+      if (cont->state != CRUNNABLE)
+      	continue;      
+
+      for (k = (cont->nextproc % cont->mproc); k < cont->mproc; k++) {
+      	
+      	  p = &cont->ptable[k]; 
+
+      	  cont->nextproc = cont->nextproc + 1;
+
+	      if(p->state != RUNNABLE)
+	        continue;
+
+	      // Switch to chosen process.  It is the process's job
+	      // to release ctable.lock and then reacquire it
+	      // before jumping back to us.
+	      c->proc = p;
+	      switchuvm(p);
+	      p->state = RUNNING;
+
+	      swtch(&(c->scheduler), p->context);
+	      switchkvm();
+
+	      // Process is done running for now.
+	      // It should have changed its p->state before coming back.
+	      c->proc = 0;
+	  }
+    }
+    releasectable();
+
+  }
 }
 
 /* Moves file src to folder dst 
@@ -150,8 +353,8 @@ ccreate(char* name, char* progv[MAXARG], int progc, int mproc, uint msz, uint md
 	nc->msz = msz;
 	nc->mdsk = mdsk;
 	nc->rootdir = rootdir;
-	nc->procs = malloc(sizeof(struct proc *) * mproc);
-	// TODO: Possibly malloc each proc? and set to unused like normal ptable?
+	cprintf("This will def crash\n");
+	//nc->ptable = malloc(sizeof(struct proc *) * mproc);
 	strncpy(nc->name, name, 16);
 	nc->state = CRUNNABLE;	
 	release(&ctable.lock);	
