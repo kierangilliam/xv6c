@@ -125,6 +125,7 @@ int 			 cstart(char*, char**, int);
 void			initprocess(void);
 void            exit(void);
 int             fork(void);
+struct proc*    allocproc(struct cont*);
 int             growproc(int);
 int             kill(int);
 struct proc*    myproc();

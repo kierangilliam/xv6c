@@ -627,22 +627,31 @@ namex(char *path, int nameiparent, char *name)
 {
   struct inode *ip, *next;
 
-  if(*path == '/')
+  cprintf("namex begin\n");
+
+  // Absolute or relative
+  if(*path == '/') // TODO: CHANGE TO ACCOUNT FOR CONT
     ip = iget(ROOTDEV, ROOTINO);
   else
-    ip = idup(myproc()->cwd);
+    ip = idup(myproc()->cwd); // TODO: MAKE SURE PROC DOESNT STEP OUTSIDE OF CONT
+
+  cprintf("namex continue2..\n");
 
   while((path = skipelem(path, name)) != 0){
+    cprintf("namex continue3..\n");
     ilock(ip);
+    cprintf("namex continue4..\n");
     if(ip->type != T_DIR){
       iunlockput(ip);
       return 0;
     }
+    cprintf("namex continue5..\n");
     if(nameiparent && *path == '\0'){
       // Stop one level early.
       iunlock(ip);
       return ip;
     }
+    cprintf("namex continue6..\n");
     if((next = dirlookup(ip, name, 0)) == 0){
       iunlockput(ip);
       return 0;

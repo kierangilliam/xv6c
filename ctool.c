@@ -4,6 +4,11 @@
 #include "param.h"
 #include "fcntl.h" 
 
+/* 
+ctool create ctest1 -p 4 sh ps cat echoloop
+ctool start ctest1 echoloop ab
+*/ 
+
 // TODO: Clean up tab space formatting of modified files
 // TODO: Rewrite comments on proc.c, comment container.c
 
@@ -24,7 +29,7 @@ cp(char* dst, char* file)
   char buffer[1024];
   int files[2];
   int count;
-  int pathsize = strlen(dst) + strlen(file) + 2; // './' dst.len + '/' + src.len + \0
+  int pathsize = strlen(dst) + strlen(file) + 2; // dst.len + '/' + src.len + \0
   char path[pathsize]; 
 
   memmove(path, dst, strlen(dst));
@@ -39,8 +44,8 @@ cp(char* dst, char* file)
   files[1] = open(path, O_WRONLY | O_CREATE);
   if (files[1] == -1) { // Check if file opened (permissions problems ...) 
     printf(1, "failed to create file |%s|\n", path);
-      close(files[0]);
-      return -1;
+    close(files[0]);
+    return -1;
   }
 
   while ((count = read(files[0], buffer, sizeof(buffer))) != 0)

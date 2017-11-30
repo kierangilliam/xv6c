@@ -195,6 +195,7 @@ sched(void)
   int intena;
   struct proc *p = myproc();
 
+  // TODO: Maybe hold ptable lock?
   if(!holding(ctablelock()))
     panic("sched ctable.lock");
   if(mycpu()->ncli != 1)
@@ -320,6 +321,7 @@ movefile(char* dst, char* src) {
 	return 1;
 }
 
+// TODO: Block processes inside non root containers from ccreating
 int 
 ccreate(char* name, char* progv[MAXARG], int progc, int mproc, uint msz, uint mdsk)
 {
@@ -367,6 +369,8 @@ int
 cstart(char* name, char** argv, int argc) 
 {	
 	struct cont *c;
+	struct cpu *cpu;
+	struct proc *p;
 	int i;
 
 	// Find container
@@ -374,29 +378,41 @@ cstart(char* name, char** argv, int argc)
 
 	for (i = 0; i < NCONT; i++) {
 		c = &ctable.cont[i];
-		if (strcmp(name, c->name) == 0)
+		// TODO: Check if this works
+		if (strncmp(name, c->name, strlen(name)) == 0)
 			goto found;
 	}
 
 	release(&ctable.lock);
 	return -1;
 
-found:
+found: 	
 
 	// Check if RUNNABLE
 	if (c->state != CRUNNABLE) {
 		release(&ctable.lock);	
 		return -1;
 	}
-	
-	// allocproc
-	// Exec procecess
-	// Attach to a vc
+
+	// TODO: Attach to a vc
+
+	// Fork into new container
+
+	// TODO: Change namex to search container
+
+	cpu = mycpu();	
+
+	// TODO: Check: Acquire ptable?
+	// Exec process
+	cpu->proc = p;
+	cprintf("execing proc %s with argv[1] %s\n", argv[0], argv[1]);
+	// TODO: CHANGE TO ARGV[0]
+	exec("ctest1/echoloop", argv); 	
 	
 	c->state = CRUNNING;	
 
 	release(&ctable.lock);	
-	
+
 	return 1;
 }
 

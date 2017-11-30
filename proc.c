@@ -34,7 +34,7 @@ myproc(void) {
 // If found, change state to EMBRYO and initialize
 // state required to run in the kernel.
 // Otherwise return 0.
-static struct proc*
+struct proc*
 allocproc(struct cont *parentcont)
 {
   struct proc *p;
@@ -453,6 +453,7 @@ procdump(void)
 
   acquirectable();
 
+  // TODO: Fix so maybe myproc()->cont->ptable
   nproc = mycont()->mproc;
   ptable = mycont()->ptable;
 
