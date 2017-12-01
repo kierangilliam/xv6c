@@ -114,7 +114,6 @@ void 			 acquirectable(void);
 void 			 releasectable(void);
 struct spinlock* ctablelock(void);
 struct cont*     mycont(void);
-struct cont* 	 rootcont(void);
 void             cinit(void);
 void             scheduler(void) __attribute__((noreturn));
 void             sched(void);
@@ -122,7 +121,7 @@ int 			 ccreate(char*, char**, int, int, uint, uint);
 int 			 cstart(char*, char**, int);
 
 // proc.c
-void			initprocess(void);
+struct proc*	initprocess(struct cont*, char*, int);
 void            exit(void);
 int             fork(void);
 struct proc*    allocproc(struct cont*);

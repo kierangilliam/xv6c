@@ -521,7 +521,7 @@ sys_cstart(void)
       return -1;
   }
 
-  cprintf("sys_cstart\nuargv: %d\nname: %s\nargc: %d\n", uargv, name, argc);
+  cprintf("sys_cstart\n\tuargv: %d\n\tname: %s\n\targc: %d\n", uargv, name, argc);
   for (i = 0; i < argc; i++) 
     cprintf("\t%s\n", argv[i]);
   

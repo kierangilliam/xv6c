@@ -20,6 +20,7 @@
 #include "fs.h"
 #include "buf.h"
 #include "file.h"
+#include "container.h"
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 static void itrunc(struct inode*);
@@ -531,12 +532,16 @@ dirlookup(struct inode *dp, char *name, uint *poff)
   if(dp->type != T_DIR)
     panic("dirlookup not DIR");
 
+  cprintf("\t\ttest\n");
+
   for(off = 0; off < dp->size; off += sizeof(de)){
     if(readi(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
       panic("dirlookup read");
+    cprintf("\t\ttesta\n");
     if(de.inum == 0)
       continue;
     if(namecmp(name, de.name) == 0){
+      cprintf("\t\ttesta\n");
       // entry matches path element
       if(poff)
         *poff = off;
@@ -625,44 +630,62 @@ skipelem(char *path, char *name)
 static struct inode*
 namex(char *path, int nameiparent, char *name)
 {
-  struct inode *ip, *next;
+  struct inode *ip, *next, *iroot;
 
-  cprintf("namex begin\n");
+  iroot = iget(ROOTDEV, ROOTINO);
+
+  cprintf("namex begin %s\n", path);
+  cprintf("\tmyproc is %s\n", ((myproc() == 0) ? "null" : myproc()->name));
 
   // Absolute or relative
-  if(*path == '/') // TODO: CHANGE TO ACCOUNT FOR CONT
-    ip = iget(ROOTDEV, ROOTINO);
-  else
-    ip = idup(myproc()->cwd); // TODO: MAKE SURE PROC DOESNT STEP OUTSIDE OF CONT
+  if (myproc() == 0)
+    ip = iroot;
+  else if(*path == '/') 
+    ip = idup(myproc()->cont->rootdir);
+  else{    
+    ip = idup(myproc()->cwd);
+    cprintf("\t\there.5 myproc cwd is it's container %d\n", (myproc()->cwd->inum == myproc()->cont->rootdir->inum));
+    cprintf("\t\trootdir is type folder %d\n", (myproc()->cont->rootdir->type == T_DIR));    
+  }
 
-  cprintf("namex continue2..\n");
+  cprintf("\tHere\n");
 
   while((path = skipelem(path, name)) != 0){
-    cprintf("namex continue3..\n");
     ilock(ip);
-    cprintf("namex continue4..\n");
+    cprintf("Here1.5\n");
     if(ip->type != T_DIR){
       iunlockput(ip);
+      cprintf("Here2\n");
       return 0;
     }
-    cprintf("namex continue5..\n");
     if(nameiparent && *path == '\0'){
       // Stop one level early.
       iunlock(ip);
+      cprintf("Here3\n");
       return ip;
     }
-    cprintf("namex continue6..\n");
+    cprintf("\tHere3.5\n");
     if((next = dirlookup(ip, name, 0)) == 0){
       iunlockput(ip);
+      cprintf("Here4\n");
       return 0;
-    }
+    }    
     iunlockput(ip);
-    ip = next;
+
+    cprintf("\tHere5\n");
+    
+    // If myproc is running in root container, 
+    // or the above (next) folder is not the root folder,
+    // then set ip = next
+    // TODO: validate that this works
+    if (myproc()->cont->rootdir->inum == iroot->inum || next->inum != iroot->inum)
+      ip = next;
   }
   if(nameiparent){
     iput(ip);
     return 0;
   }
+  cprintf("\treturning ip\n");
   return ip;
 }
 

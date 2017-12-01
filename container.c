@@ -8,6 +8,9 @@
 #include "x86.h"
 #include "container.h"
 #include "proc.h"
+#include "sleeplock.h" // TODO: REmove
+#include "fs.h"// TODO: remove
+#include "file.h" // TODO: remove
 
 
 static struct cont* alloccont(void);
@@ -84,7 +87,7 @@ ctablelock(void)
 	return &ptable.lock;
 }
 
-void
+struct cont*
 initcontainer(void)
 {
 	int i,
@@ -112,15 +115,18 @@ initcontainer(void)
 		ctable.cont[i].ptable = ptable.proc[i];
 
 	release(&ctable.lock);	
+
+	return c;
 }
 
 // Set up first user container and process.
 void
 userinit(void)
 {
-  initcontainer();
-  initprocess();  
-  cprintf("init process\n");
+	cprintf("userinit\n");
+	struct cont* root;
+  	root = initcontainer();
+  	initprocess(root, "initproc", 1);    	
 }
 
 void
@@ -146,15 +152,15 @@ mycont(void) {
 	return currcont;
 }
 
-struct cont* 	
-rootcont(void) {
-	struct cont *c;
-	// TODO: Check to make sure it always inits at first index
-  	acquire(&ctable.lock);  
-  	c = &ctable.cont[0];
-  	release(&ctable.lock);
-  	return c;
-}
+// struct cont* 	
+// rootcont(void) {
+// 	struct cont *c;
+// 	// TODO: Check to make sure it always inits at first index
+//   	acquire(&ctable.lock);  
+//   	c = &ctable.cont[0];
+//   	release(&ctable.lock);
+//   	return c;
+// }
 
 // Look in the container table for an CUNUSED cont.
 // If found, change state to CEMBRYO
@@ -270,6 +276,104 @@ scheduler(void)
   }
 }
 
+// TODO: Block processes inside non root containers from ccreating
+int 
+ccreate(char* name, char* progv[MAXARG], int progc, int mproc, uint msz, uint mdsk)
+{
+	int i;
+	struct cont *nc;
+	struct inode *rootdir;
+
+	// Allocate container.
+	if ((nc = alloccont()) == 0) {
+		return -1;
+	}
+
+	// Create a directory (same implementation as sys_mkdir)	
+	begin_op();
+	if((rootdir = create(name, T_DIR, 0, 0)) == 0){
+		end_op();
+		cprintf("Unable to create container directory %s\n", name);
+		return -1;
+	}
+	iunlockput(rootdir);
+	end_op();	
+
+	// Move files into folder
+	for (i = 0; i < progc; i++) {
+		if (movefile(name, progv[i]) == 0) 
+			cprintf("Unable to move file %s\n", progv[i]);
+	}
+
+	acquire(&ctable.lock);
+	nc->mproc = mproc;
+	nc->msz = msz;
+	nc->mdsk = mdsk;
+	nc->rootdir = rootdir;	
+	strncpy(nc->name, name, 16);	
+	nc->state = CRUNNABLE;	
+	release(&ctable.lock);	
+
+	cprintf("inited container %s\n", nc->name);
+
+	return 1;  
+}
+
+// Allocates a process for the table "name"
+// Runs argv[0] (argv is program plus arguments)
+int
+cstart(char* name, char** argv, int argc) 
+{	
+	cprintf("Cstart\n");
+	struct cont *c;
+	struct cpu *cpu;
+	struct proc *p;
+	int i;
+
+	// Find container
+	acquire(&ctable.lock);
+
+	for (i = 0; i < NCONT; i++) {
+		c = &ctable.cont[i];
+		// TODO: Check if this works
+		if (strncmp(name, c->name, strlen(name)) == 0 && c->state == CRUNNABLE)
+			goto found;
+	}
+
+	release(&ctable.lock);
+	return -1;
+
+found: 	
+
+	cprintf("\tFound container to run (%s)\n", c->name);
+
+	// TODO: Attach to a vc
+
+	p = initprocess(c, argv[0], 0);
+
+	cprintf("\tInit first process\n");	
+	cprintf("\t\t/ctest1 is equal to this container's inode %d\n", (namei("/ctest1")->inum == c->rootdir->inum));
+
+	cpu = mycpu();	
+
+	// TODO: Check: Acquire ptable?
+	// Exec process
+	cpu->proc = p;
+	cprintf("execing proc %s with argv[1] %s\n", argv[0], argv[1]);
+	// TODO: CHANGE TO ARGV[0]
+	// Would it be too ugly to add a cont struct parameter "char** initprocess" and state "CREADY" 
+	// for a container that is about to run its init proc?
+	// Then do exec inside scheduler
+	exec("echoloop", argv); 	
+	
+	c->state = CRUNNING;	
+
+	release(&ctable.lock);	
+
+	return 1;
+}
+
+
 /* Moves file src to folder dst 
 TODO: Implement */
 int
@@ -320,101 +424,3 @@ movefile(char* dst, char* src) {
 
 	return 1;
 }
-
-// TODO: Block processes inside non root containers from ccreating
-int 
-ccreate(char* name, char* progv[MAXARG], int progc, int mproc, uint msz, uint mdsk)
-{
-	int i;
-	struct cont *nc;
-	struct inode *rootdir;
-
-	// Allocate container.
-	if ((nc = alloccont()) == 0) {
-		return -1;
-	}
-
-	// Create a directory (same implementation as sys_mkdir)	
-	// TODO: check if container exists
-	begin_op();
-	if((rootdir = create(name, T_DIR, 0, 0)) == 0){
-		end_op();
-		cprintf("Unable to create container directory %s\n", name);
-		return -1;
-	}
-	iunlockput(rootdir);
-	end_op();	
-
-	// Move files into folder
-	for (i = 0; i < progc; i++) {
-		if (movefile(name, progv[i]) == 0) 
-			cprintf("Unable to move file %s\n", progv[i]);
-	}
-
-	acquire(&ctable.lock);
-	nc->mproc = mproc;
-	nc->msz = msz;
-	nc->mdsk = mdsk;
-	nc->rootdir = rootdir;
-	strncpy(nc->name, name, 16);
-	nc->state = CRUNNABLE;	
-	release(&ctable.lock);	
-
-	return 1;  
-}
-
-// Allocates a process for the table "name"
-// Runs argv[0] (argv is program plus arguments)
-int
-cstart(char* name, char** argv, int argc) 
-{	
-	struct cont *c;
-	struct cpu *cpu;
-	struct proc *p;
-	int i;
-
-	// Find container
-	acquire(&ctable.lock);
-
-	for (i = 0; i < NCONT; i++) {
-		c = &ctable.cont[i];
-		// TODO: Check if this works
-		if (strncmp(name, c->name, strlen(name)) == 0)
-			goto found;
-	}
-
-	release(&ctable.lock);
-	return -1;
-
-found: 	
-
-	// Check if RUNNABLE
-	if (c->state != CRUNNABLE) {
-		release(&ctable.lock);	
-		return -1;
-	}
-
-	// TODO: Attach to a vc
-
-	// Fork into new container
-
-	// TODO: Change namex to search container
-
-	cpu = mycpu();	
-
-	// TODO: Check: Acquire ptable?
-	// Exec process
-	cpu->proc = p;
-	cprintf("execing proc %s with argv[1] %s\n", argv[0], argv[1]);
-	// TODO: CHANGE TO ARGV[0]
-	exec("ctest1/echoloop", argv); 	
-	
-	c->state = CRUNNING;	
-
-	release(&ctable.lock);	
-
-	return 1;
-}
-
-
-
