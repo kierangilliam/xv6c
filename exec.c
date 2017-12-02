@@ -6,10 +6,12 @@
 #include "defs.h"
 #include "x86.h"
 #include "elf.h"
+#include "container.h"
 
 int
 exec(char *path, char **argv)
-{
+{  
+  cprintf("exec running\n");
   char *s, *last;
   int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
@@ -21,13 +23,19 @@ exec(char *path, char **argv)
 
   begin_op();
 
+  if (myproc()->cont->state == CREADY)
+    path = "/ctest1/init";
+
   if((ip = namei(path)) == 0){
     end_op();
     cprintf("exec: fail\n");
     return -1;
   }
+  cprintf("exec: got an ip\n");
   ilock(ip);
   pgdir = 0;
+
+  cprintf("exec: locked ip\n");
 
   // Check ELF header
   if(readi(ip, (char*)&elf, 0, sizeof(elf)) != sizeof(elf))
@@ -37,6 +45,8 @@ exec(char *path, char **argv)
 
   if((pgdir = setupkvm()) == 0)
     goto bad;
+
+  cprintf("exec: set up kvm\n");
 
   // Load program into memory.
   sz = 0;
@@ -59,6 +69,7 @@ exec(char *path, char **argv)
   iunlockput(ip);
   end_op();
   ip = 0;
+  cprintf("exec: mem set stff\n");
 
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
@@ -67,7 +78,7 @@ exec(char *path, char **argv)
     goto bad;
   clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
   sp = sz;
-
+cprintf("exec: allocuvm didnt fail\n");
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
@@ -86,6 +97,7 @@ exec(char *path, char **argv)
   sp -= (3+argc+1) * 4;
   if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
     goto bad;
+  cprintf("exec: before string copy\n");
 
   // Save program name for debugging.
   for(last=s=path; *s; s++)
@@ -99,6 +111,7 @@ exec(char *path, char **argv)
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
+  cprintf("exec: switchuvm\n");
   switchuvm(curproc);
   freevm(oldpgdir);
   return 0;

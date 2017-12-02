@@ -7,6 +7,9 @@
 #include "proc.h"
 #include "spinlock.h"
 #include "container.h"
+#include "fs.h" // TODO: REMOVE
+#include "sleeplock.h"// TODO: REMOVE
+#include "file.h"// TODO: REMOVE
 
 static struct proc *initproc;
 
@@ -84,12 +87,12 @@ found:
   p->ticks = 0;
   p->cont = parentcont;
 
-  procdump();
-
   return p;
 }
 
 // Set up first user process for a given container.
+// If this is not the first root process, exec will
+// set the sz and pgdir for the initialized process
 struct proc*
 initprocess(struct cont* parentcont, char* name, int isroot)
 {
@@ -97,13 +100,18 @@ initprocess(struct cont* parentcont, char* name, int isroot)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   p = allocproc(parentcont);
+
+  if((p->pgdir = setupkvm()) == 0) {
+    if (isroot)
+      panic("userinit: out of memory?");
+    else 
+      return 0;
+  }
   
   if (isroot) {
-    initproc = p;
-    if((p->pgdir = setupkvm()) == 0)
-      panic("userinit: out of memory?");
-    inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
-    p->sz = PGSIZE;
+    initproc = p;     
+
+    inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);      
     memset(p->tf, 0, sizeof(*p->tf));
     p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
     p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -113,6 +121,8 @@ initprocess(struct cont* parentcont, char* name, int isroot)
     p->tf->esp = PGSIZE;
     p->tf->eip = 0;  // beginning of initcode.S
   }
+
+  p->sz = PGSIZE;
 
   safestrcpy(p->name, name, sizeof(p->name));
   p->cwd = parentcont->rootdir;
@@ -199,6 +209,55 @@ fork(void)
   releasectable();
 
   return pid;
+}
+
+// TODO: Delete
+struct proc*
+cfork(struct cont* parentcont)
+{
+  //int i;
+  struct proc *np;
+  struct proc *curproc = myproc();
+
+  // Allocate process.
+  if((np = allocproc(parentcont)) == 0){
+    return 0;
+  }
+
+  // Copy process state from proc.
+  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->state = UNUSED;
+    return 0;
+  }
+  np->sz = curproc->sz;
+  np->parent = curproc;
+  *np->tf = *curproc->tf;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  // If parent cont is the same as curproc
+      // for(i = 0; i < NOFILE; i++)
+      //   if(curproc->ofile[i])
+      //     np->ofile[i] = filedup(curproc->ofile[i]);
+      // np->cwd = idup(curproc->cwd);
+  np->cwd = parentcont->rootdir;
+  cprintf("cfork new proc container %s\n", (np->cont->name));
+  cprintf("cfork new proc container rootdir is a folder %d\n", (np->cont->rootdir->type == 1));
+  cprintf("cfork new proc cwd is a folder: %d\n", (np->cwd->type == 1));
+
+  //safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+  safestrcpy(np->name, "testproc", sizeof("testproc"));
+
+  acquirectable();
+
+  np->state = RUNNABLE;
+
+  releasectable();
+
+  return np;
 }
 
 // Exit the current process.  Does not return.
@@ -319,7 +378,20 @@ forkret(void)
   // Still holding ctablelock from scheduler.
   releasectable();
 
-  if (first) {
+  cprintf("my proc %s\n", myproc()->name);
+  // if (myproc()->cont->state == CREADY) {
+  //   // make runnable and exec current process
+  //   cprintf("%s execing\n", myproc()->name);
+  //   char *argj[4] = { "echoloop", "100", "ab", 0 };
+  //   cprintf("execing proc %s with argv[1] %s\n", argj[0], argj[1]);   
+  //   if (exec(argj[0], argj) == -1) {
+  //     cprintf("exec proc failed\n");
+  //   } else {
+  //     cprintf("exec proc should have worked\n");
+  //   }
+  // }
+
+  if (first) {    
     // Some initialization functions must be run in the context
     // of a regular process (e.g., they call sleep), and thus cannot
     // be run from main().
@@ -358,8 +430,6 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = chan;
   p->state = SLEEPING;
 
-  //cprintf("Sleeping %s\n", p->name);
-
   sched();
 
   // Tidy up.
@@ -382,15 +452,12 @@ wakeup1(void *chan)
   struct proc *ptable;
   int nproc;
 
-  //cprintf("May not work, may have to wake up all containers processes\n");
-
   // TODO: maybe remove mycont() function then change this to work
   nproc = mycont()->mproc;
   ptable = mycont()->ptable;
 
   for(p = ptable; p < &ptable[nproc]; p++)
     if(p->state == SLEEPING && p->chan == chan) {
-      //cprintf("Waking up: %s\n", p->name);
       p->state = RUNNABLE;
     }
 }
@@ -431,54 +498,4 @@ kill(int pid)
   }
   releasectable();
   return -1;
-}
-
-//PAGEBREAK: 36
-// Print a process listing of current container to console.  For debugging.
-// Runs when user types ^P on console.
-// No lock to avoid wedging a stuck machine further.
-void
-procdump(void)
-{
-  static char *states[] = {
-  [UNUSED]    "unused",
-  [EMBRYO]    "embryo",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
-  };
-  int i;
-  struct proc *p;
-  char *state;
-  uint pc[10];
-
-  struct proc *ptable;
-  int nproc;
-
-  acquirectable();
-
-  // TODO: Fix so maybe myproc()->cont->ptable
-  nproc = mycont()->mproc;
-  ptable = mycont()->ptable;
-
-  cprintf("procdump() nproc: %d\n", nproc);
-
-  for(p = ptable; p < &ptable[nproc]; p++){
-    if(p->state == UNUSED)
-      continue;
-    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
-      state = states[p->state];
-    else
-      state = "???";
-    cprintf("cid: %d. %d %s %s", p->cont->cid, p->pid, state, p->name);
-    if(p->state == SLEEPING){
-      getcallerpcs((uint*)p->context->ebp+2, pc);
-      for(i=0; i<10 && pc[i] != 0; i++)
-        cprintf(" %p", pc[i]);
-    }
-    cprintf("\n");
-  }
-
-  releasectable();
 }

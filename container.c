@@ -61,16 +61,13 @@ void
 cinit(void)
 {
   initlock(&ctable.lock, "ctable");
-  // TODO: Remove
-  contdump();
+  initlock(&ptable.lock, "ptable");
 }
 
 void
 acquirectable(void) 
 {
-	//cprintf("\t\tWaiting on acquiring ctable...\n");
 	acquire(&ptable.lock);
-	//cprintf("\t\tGot ctable\n");
 }
 // TODO: refactor name of ctablelock to ptable
 // TODO: replace these aqcuires and releases with normal aqcuire and release using ctablelock()
@@ -116,6 +113,8 @@ initcontainer(void)
 
 	release(&ctable.lock);	
 
+	cprintf("Init container\n");
+
 	return c;
 }
 
@@ -129,24 +128,7 @@ userinit(void)
   	initprocess(root, "initproc", 1);    	
 }
 
-void
-contdump(void)
-{
-	static char *states[] = {
-	  [CUNUSED]    "unused",
-	  [CRUNNING]   "running",
-	  [CPAUSED]    "paused",
-	  [CRUNNABLE]  "runnable",
-	  [CEMBRYO]    "embryo"
-	  };
-	int i;
-  
-  	acquire(&ctable.lock);
-  	for (i = 0; i < NCONT; i++)
-  		cprintf("container %d: %s\n", ctable.cont[i].cid, states[ctable.cont[i].state]);
-  	release(&ctable.lock);
-}
-
+//TODO: REMOVE!!
 struct cont*
 mycont(void) {
 	return currcont;
@@ -201,10 +183,9 @@ sched(void)
   int intena;
   struct proc *p = myproc();
 
-  // TODO: Maybe hold ptable lock?
   if(!holding(ctablelock()))
-    panic("sched ctable.lock");
-  if(mycpu()->ncli != 1)
+    panic("sched ptable.lock");
+  if(mycpu()->ncli != 1) 
     panic("sched locks");
   if(p->state == RUNNING)
     panic("sched running");
@@ -244,17 +225,23 @@ scheduler(void)
 
       cont = &ctable.cont[i];
 
-      if (cont->state != CRUNNABLE)
-      	continue;      
+      if (cont->state != CRUNNABLE && cont->state != CREADY)
+      	continue;            
 
       for (k = (cont->nextproc % cont->mproc); k < cont->mproc; k++) {
       	
-      	  p = &cont->ptable[k]; 
+      	  p = &cont->ptable[k];       	  
 
       	  cont->nextproc = cont->nextproc + 1;
 
 	      if(p->state != RUNNABLE)
 	        continue;
+
+	      if (strncmp("ctest1", cont->name, strlen("ctest1")) == 0 && strncmp("testproc", p->name, strlen("testproc")) == 0) {
+	      	cprintf("\t\tScheduling %s proc %s\n", cont->name, p->name);
+	      }
+			
+
 
 	      // Switch to chosen process.  It is the process's job
 	      // to release ctable.lock and then reacquire it
@@ -263,7 +250,7 @@ scheduler(void)
 	      switchuvm(p);
 	      p->state = RUNNING;
 
-	      swtch(&(c->scheduler), p->context);
+	      swtch(&(c->scheduler), p->context); 
 	      switchkvm();
 
 	      // Process is done running for now.
@@ -280,41 +267,43 @@ scheduler(void)
 int 
 ccreate(char* name, char* progv[MAXARG], int progc, int mproc, uint msz, uint mdsk)
 {
+	// TODO: check to make sure there are no containers with the same name
 	int i;
 	struct cont *nc;
-	struct inode *rootdir;
+	//struct inode *rootdir;
 
 	// Allocate container.
 	if ((nc = alloccont()) == 0) {
 		return -1;
 	}
 
-	// Create a directory (same implementation as sys_mkdir)	
-	begin_op();
-	if((rootdir = create(name, T_DIR, 0, 0)) == 0){
-		end_op();
-		cprintf("Unable to create container directory %s\n", name);
-		return -1;
-	}
-	iunlockput(rootdir);
-	end_op();	
+	// // Create a directory (same implementation as sys_mkdir)	
+	// begin_op();
+	// if((rootdir = create(name, T_DIR, 0, 0)) == 0){
+	// 	end_op();
+	// 	cprintf("Unable to create container directory %s\n", name);
+	// 	return -1;
+	// }
+	// iunlockput(rootdir);
+	// end_op();	
 
-	// Move files into folder
+	// TODO: Move files into folder
 	for (i = 0; i < progc; i++) {
-		if (movefile(name, progv[i]) == 0) 
-			cprintf("Unable to move file %s\n", progv[i]);
+		// if (movefile(name, progv[i]) == 0) 
+		// 	cprintf("Unable to move file %s\n", progv[i]);
 	}
 
 	acquire(&ctable.lock);
 	nc->mproc = mproc;
 	nc->msz = msz;
 	nc->mdsk = mdsk;
-	nc->rootdir = rootdir;	
-	strncpy(nc->name, name, 16);	
-	nc->state = CRUNNABLE;	
+	nc->rootdir = namei(name); // TODO: Check this with an if
+	strncpy(nc->name, name, 16); // TODO: strlen(name) instead of 16?
+	nc->state = CREADY;	
 	release(&ctable.lock);	
 
 	cprintf("inited container %s\n", nc->name);
+	cprintf("rootdir is type folder %d\n", (nc->rootdir->type == T_DIR));    
 
 	return 1;  
 }
@@ -325,50 +314,70 @@ int
 cstart(char* name, char** argv, int argc) 
 {	
 	cprintf("Cstart\n");
-	struct cont *c;
-	struct cpu *cpu;
-	struct proc *p;
+	struct cont *nc;
+	//struct cpu *cpu;
+	struct proc *np;
 	int i;
 
 	// Find container
 	acquire(&ctable.lock);
 
 	for (i = 0; i < NCONT; i++) {
-		c = &ctable.cont[i];
+		nc = &ctable.cont[i];
 		// TODO: Check if this works
-		if (strncmp(name, c->name, strlen(name)) == 0 && c->state == CRUNNABLE)
+		if (strncmp(name, nc->name, strlen(name)) == 0 && nc->state == CREADY)
 			goto found;
 	}
 
+	cprintf("No free container with name %s \n", name);
 	release(&ctable.lock);
 	return -1;
 
 found: 	
 
-	cprintf("\tFound container to run (%s)\n", c->name);
+	cprintf("\tFound container to run (%s)\n", nc->name);
 
 	// TODO: Attach to a vc
 
-	p = initprocess(c, argv[0], 0);
+	// TODO COMMENT THIS A TON
 
-	cprintf("\tInit first process\n");	
-	cprintf("\t\t/ctest1 is equal to this container's inode %d\n", (namei("/ctest1")->inum == c->rootdir->inum));
+	// TODO: Change init process back
+	// TODO: Clean up cfork/ change fork to accept a parent container
 
-	cpu = mycpu();	
+	cprintf("cstart: nc->rootdir->type %d", nc->rootdir->type);
 
-	// TODO: Check: Acquire ptable?
-	// Exec process
-	cpu->proc = p;
-	cprintf("execing proc %s with argv[1] %s\n", argv[0], argv[1]);
-	// TODO: CHANGE TO ARGV[0]
-	// Would it be too ugly to add a cont struct parameter "char** initprocess" and state "CREADY" 
-	// for a container that is about to run its init proc?
-	// Then do exec inside scheduler
-	exec("echoloop", argv); 	
+	// if ((np = cfork(nc)) == 0) {
+	// 	cprintf("couldn't cfork\n");
+	// 	release(&ctable.lock);
+	// 	return -1;
+	// }
+	np = initprocess(nc, "initproc", 0);
+
+	nc->state = CREADY;	
+	// myproc()->state = RUNNABLE; 
+	cprintf("np->state is RUNNABLE: %d\n", (np->state == RUNNABLE));
+
+	release(&ctable.lock);
+	// acquirectable();
+	// sched();
+	// releasectable();
 	
-	c->state = CRUNNING;	
+	// Does copyuvm not also copy the place in kernel vm?
+	cprintf("This should print twice: container %s proc %s\n", myproc()->cont->name, myproc()->name);
 
-	release(&ctable.lock);	
+	// If we are the new process 
+	// if (myproc()->cont->rootdir->inum == nc->rootdir->inum) {
+	// 	cprintf("New process will exec\n");
+	// 	// TODO: make sure argv is null terminated
+	// 	char *argj[4] = { "echoloop", "100", "ab", 0 };
+	// 	cprintf("execing proc echoloop with argv[1] %s\n", argj[0], argj[1]);		
+	// 	exec(argj[0], argj); 	
+	// }
+	// else {
+	// 	cprintf("CONFIRMATION THAT OTHER GUY RAN\n");
+	// }		
+
+	//	release(&ctable.lock);	
 
 	return 1;
 }
@@ -423,4 +432,63 @@ movefile(char* dst, char* src) {
 
 
 	return 1;
+}
+
+//PAGEBREAK: 36
+// Print a process listing of current container to console.  For debugging.
+// Runs when user types ^P on console.
+// No lock to avoid wedging a stuck machine further.
+void
+contdump(void)
+{
+  static char *states[] = {
+  [UNUSED]    "unused",
+  [EMBRYO]    "embryo",
+  [SLEEPING]  "sleep ",
+  [RUNNABLE]  "runble",
+  [RUNNING]   "run   ",
+  [ZOMBIE]    "zombie"
+  };
+  int i, k, nextproc;
+  struct cont *c;
+  struct proc *p;
+  char *state;
+  uint pc[10];
+
+  cprintf("Contdump()\n");
+  cprintf("cont 2 p[0] %s %s\n", ctable.cont[1].ptable[0].name, states[ctable.cont[1].ptable[0].state]);
+
+  acquirectable();
+
+  for(i = 0; i < NCONT; i++) {
+
+      c = &ctable.cont[i];
+      nextproc = 0, k = 0;
+
+      if (c->state == CUNUSED)
+      	continue;
+
+      for (k = (nextproc % c->mproc); k < c->mproc; k++) {
+      
+      	p = &c->ptable[k]; 
+
+      	nextproc++;
+
+	    if(p->state == UNUSED)
+		    continue;
+	    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
+	      state = states[p->state];
+	    else
+	      state = "???";
+	    cprintf("container: %s. %d %s %s", p->cont->name, p->pid, state, p->name);
+	    if(p->state == SLEEPING){
+	      getcallerpcs((uint*)p->context->ebp+2, pc);
+	      for(i=0; i<10 && pc[i] != 0; i++)
+	        cprintf(" %p", pc[i]);
+	    }
+	    cprintf("\n");
+	  }
+  }
+
+  releasectable();
 }

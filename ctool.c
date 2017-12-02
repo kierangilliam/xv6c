@@ -9,6 +9,7 @@ ctool create ctest1 -p 4 sh ps cat echoloop
 ctool start ctest1 echoloop ab
 */ 
 
+// TODO: do a giant diff on xv6 and xv6c to find all differences
 // TODO: Clean up tab space formatting of modified files
 // TODO: Rewrite comments on proc.c, comment container.c
 
@@ -96,6 +97,7 @@ create(int argc, char *argv[])
 
   progc = argc - last_flag - 1;
 
+  mkdir(argv[2]);
 
   printf(1, "name: %s\nmproc: %d\nmsz: %d\nmdsk: %d\nprogc: %d\n", argv[2], mproc, msz, mdsk, progc);
 
@@ -104,6 +106,9 @@ create(int argc, char *argv[])
   } else {
     printf(1, "Failed to create container %s\n", argv[2]); 
   }
+
+  // TODO: delete init after cstarting
+  cp(argv[2], "init");
 
   for (i = last_flag + 1, k = 0; i < argc; i++, k++) {
 

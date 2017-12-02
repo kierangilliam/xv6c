@@ -13,7 +13,7 @@ struct cpu {
 extern struct cpu cpus[NCPU];
 extern int ncpu;
 
-enum contstate { CUNUSED, CEMBRYO, CRUNNABLE, CPAUSED, CRUNNING };
+enum contstate { CUNUSED, CEMBRYO, CREADY, CRUNNABLE, CPAUSED, CRUNNING };
 
 // TODO: maybe remove cid?
 struct cont {
