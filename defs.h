@@ -118,11 +118,11 @@ void             cinit(void);
 void             scheduler(void) __attribute__((noreturn));
 void             sched(void);
 int 			 ccreate(char*, int, uint, uint);
-int 			 cstart(char*, char**, int);
+int 			 cstart(char*);
 void             contdump(void);
 
 // proc.c
-struct proc*	initprocess(struct cont*, char*, int);
+struct proc*	initprocess(struct cont*);
 void            exit(void);
 int             fork(void);
 struct proc* 	cfork(struct cont*);

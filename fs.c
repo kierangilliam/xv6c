@@ -648,21 +648,17 @@ namex(char *path, int nameiparent, char *name)
 
   while((path = skipelem(path, name)) != 0){
     ilock(ip);
-    cprintf("test\n");
     if(ip->type != T_DIR){
       iunlockput(ip);
-      cprintf("return 0\n");
       return 0;
     }
     if(nameiparent && *path == '\0'){
       // Stop one level early.
       iunlock(ip);
-      cprintf("return ip\n");
       return ip;
     }
     if((next = dirlookup(ip, name, 0)) == 0){
       iunlockput(ip);
-      cprintf("return 0\n");
       return 0;
     }    
     iunlockput(ip);
@@ -671,8 +667,8 @@ namex(char *path, int nameiparent, char *name)
     // or the above (next) folder is not the root folder,
     // then set ip = next
     // TODO: validate that this works
-    //if (myproc()->cont->rootdir->inum == iroot->inum || next->inum != iroot->inum)
-    ip = next;
+    if (myproc()->cont->rootdir->inum == iroot->inum || next->inum != iroot->inum)
+      ip = next;
   }
   if(nameiparent){
     iput(ip);

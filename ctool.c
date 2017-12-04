@@ -112,7 +112,7 @@ start(int argc, char *argv[])
 {    
 
   char *args[MAXARG];
-  int i, k;
+  int i, k, cid;//, pid;
 
   if (argc < 4)
     usage("ctool start <name> prog arg1 [arg2 ...]");
@@ -123,8 +123,15 @@ start(int argc, char *argv[])
     memmove(args[k] + strlen(argv[i]), "\0", 1);
   }
 
-  if (cstart(argv[2], args, (argc - 3)) != 1) 
+  // TODO: Null terminate args?
+
+  if ((cid = cstart(argv[2])) < 0) 
     printf(1, "Failed to start container %s\n", argv[2]);     
+
+  // pid = cfork(cid);
+
+  // if (pid == 0) 
+  //   exec(args[0], args);
 }
 
 void

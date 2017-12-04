@@ -125,7 +125,7 @@ userinit(void)
 	cprintf("userinit\n");
 	struct cont* root;
   	root = initcontainer();
-  	initprocess(root, "initproc", 1);    	
+  	initprocess(root);    	
 }
 
 //TODO: REMOVE!!
@@ -290,25 +290,23 @@ ccreate(char* name, int mproc, uint msz, uint mdsk)
 // Allocates a process for the table "name"
 // Runs argv[0] (argv is program plus arguments)
 int
-cstart(char* name, char** argv, int argc) 
-{	
-	cprintf("Cstart\n");
+cstart(char* name) 
+{		
 	struct cont *nc;
-	//struct cpu *cpu;
-	struct proc *np;
 	int i;
+
+	cprintf("Cstart\n");
 
 	// Find container
 	acquire(&ctable.lock);
 
 	for (i = 0; i < NCONT; i++) {
 		nc = &ctable.cont[i];
-		// TODO: Check if this works
 		if (strncmp(name, nc->name, strlen(name)) == 0 && nc->state == CREADY)
 			goto found;
 	}
 
-	cprintf("No free container with name %s \n", name);
+	cprintf("No free container with name %s\n", name);
 	release(&ctable.lock);
 	return -1;
 
@@ -318,47 +316,10 @@ found:
 
 	// TODO: Attach to a vc
 
-	// TODO COMMENT THIS A TON
-
-	// TODO: Change init process back
-	// TODO: Clean up cfork/ change fork to accept a parent container
-
-	cprintf("cstart: nc->rootdir->type %d", nc->rootdir->type);
-
-	// if ((np = cfork(nc)) == 0) {
-	// 	cprintf("couldn't cfork\n");
-	// 	release(&ctable.lock);
-	// 	return -1;
-	// }
-	np = initprocess(nc, "initproc", 0);
-
 	nc->state = CREADY;	
-	// myproc()->state = RUNNABLE; 
-	cprintf("np->state is RUNNABLE: %d\n", (np->state == RUNNABLE));
-
 	release(&ctable.lock);
-	// acquirectable();
-	// sched();
-	// releasectable();
 	
-	// Does copyuvm not also copy the place in kernel vm?
-	cprintf("This should print twice: container %s proc %s\n", myproc()->cont->name, myproc()->name);
-
-	// If we are the new process 
-	// if (myproc()->cont->rootdir->inum == nc->rootdir->inum) {
-	// 	cprintf("New process will exec\n");
-	// 	// TODO: make sure argv is null terminated
-	// 	char *argj[4] = { "echoloop", "100", "ab", 0 };
-	// 	cprintf("execing proc echoloop with argv[1] %s\n", argj[0], argj[1]);		
-	// 	exec(argj[0], argj); 	
-	// }
-	// else {
-	// 	cprintf("CONFIRMATION THAT OTHER GUY RAN\n");
-	// }		
-
-	//	release(&ctable.lock);	
-
-	return 1;
+	return nc->cid;
 }
 
 //PAGEBREAK: 36

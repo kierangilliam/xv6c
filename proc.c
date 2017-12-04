@@ -91,37 +91,31 @@ found:
 // If this is not the first root process, exec will
 // set the sz and pgdir for the initialized process
 struct proc*
-initprocess(struct cont* parentcont, char* name, int isroot)
+initprocess(struct cont* parentcont)
 {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   p = allocproc(parentcont);
 
-  if((p->pgdir = setupkvm()) == 0) {
-    if (isroot)
-      panic("userinit: out of memory?");
-    else 
-      return 0;
-  }
+  if((p->pgdir = setupkvm()) == 0) 
+    panic("userinit: out of memory?");
   
-  if (isroot) {
-    initproc = p;     
-    inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);      
-    memset(p->tf, 0, sizeof(*p->tf));
-    p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
-    p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
-    p->tf->es = p->tf->ds;
-    p->tf->ss = p->tf->ds;
-    p->tf->eflags = FL_IF;
-    p->tf->esp = PGSIZE;
-    p->tf->eip = 0;  // beginning of initcode.S
-  }
+  initproc = p;     
+  inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);      
+  memset(p->tf, 0, sizeof(*p->tf));
+  p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
+  p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
+  p->tf->es = p->tf->ds;
+  p->tf->ss = p->tf->ds;
+  p->tf->eflags = FL_IF;
+  p->tf->esp = PGSIZE;
+  p->tf->eip = 0;  // beginning of initcode.S
   
 
   p->sz = PGSIZE;
 
-  safestrcpy(p->name, name, sizeof(p->name));
+  safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = parentcont->rootdir;
 
   // Set initial process's cont to root

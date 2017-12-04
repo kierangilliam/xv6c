@@ -15,7 +15,6 @@ extern int ncpu;
 
 enum contstate { CUNUSED, CEMBRYO, CREADY, CRUNNABLE, CPAUSED, CRUNNING };
 
-// TODO: maybe remove cid?
 struct cont {
 	uint msz;					// Max size of memory (bytes)
 	uint mdsk;					// Max amount of disk space (bytes)

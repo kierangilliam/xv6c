@@ -25,7 +25,7 @@ int sleep(int);
 int uptime(void);
 int getticks(void);
 int ccreate(char*, int, uint, uint);
-int cstart(char*, char**, int);
+int cstart(char*);
 int cstop(void);
 int cinfo(void);
 int cpause(void);

@@ -471,41 +471,14 @@ sys_ccreate(void)
 int
 sys_cstart(void)
 {
-  // TODO: Validate arguments (like argc is < MAXARG)
-  // cstart(char* name, char** argv, int argc)
-  //          0             1         2   
+  char *name;
 
-  char *name, *prog, *argv[MAXARG];
-  int i, argc;
-  uint uargv, uarg;
-
-  if(argstr(0, &name) < 0 || argstr(1, &prog) < 0 || argint(2, &argc) < 0) {
+  if(argstr(0, &name) < 0) {
     cprintf("sys_ccreate: Error getting pointers\n");
     return -1;
   }
-
-  if(argint(1, (int*)&uargv) < 0){
-    return -1;
-  }
-  memset(argv, 0, sizeof(argv));
-  for(i=0;; i++){
-    if(i >= NELEM(argv))
-      return -1;
-    if(fetchint(uargv+4*i, (int*)&uarg) < 0)
-      return -1;
-    if(uarg == 0){
-      argv[i] = 0;
-      break;
-    }
-    if(fetchstr(uarg, &argv[i]) < 0)
-      return -1;
-  }
-
-  cprintf("sys_cstart\n\tuargv: %d\n\tname: %s\n\targc: %d\n", uargv, name, argc);
-  for (i = 0; i < argc; i++) 
-    cprintf("\t%s\n", argv[i]);
   
-  return cstart(name, argv, argc);
+  return cstart(name);
 }
 
 int
