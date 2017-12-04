@@ -8,10 +8,13 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "spinlock.h"
+#include "container.h"
+#include "proc.h"
 
 void freerange(void *vstart, void *vend);
 extern char end[]; // first address after kernel loaded from ELF file
                    // defined by the kernel linker script in kernel.ld
+int userinited;
 
 struct run {
   struct run *next;
@@ -51,6 +54,7 @@ freerange(void *vstart, void *vend)
   for(; p + PGSIZE <= (char*)vend; p += PGSIZE)
     kfree(p);
 }
+
 //PAGEBREAK: 21
 // Free the page of physical memory pointed at by v,
 // which normally should have been returned by a
@@ -60,6 +64,10 @@ void
 kfree(char *v)
 {
   struct run *r;
+  struct cont *c;
+
+  if (userinited) 
+    c = myproc()->cont;
 
   if((uint)v % PGSIZE || v < end || V2P(v) >= PHYSTOP)
     panic("kfree");
@@ -72,6 +80,8 @@ kfree(char *v)
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
+  if (userinited)
+    c->upg--;
   if(kmem.use_lock)
     release(&kmem.lock);
 }
@@ -83,12 +93,25 @@ char*
 kalloc(void)
 {
   struct run *r;
+  struct cont *c;
+
+  if (userinited) {
+    c = myproc()->cont;
+      // Check if container is over allowed memory limits
+    if((c->upg * PGSIZE + PGSIZE) > c->msz) {
+      ckill(myproc()->cont);
+      return 0;
+    }
+  }
 
   if(kmem.use_lock)
     acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if(r){
     kmem.freelist = r->next;
+    if(userinited)
+      c->upg++;
+  }
   if(kmem.use_lock)
     release(&kmem.lock);
   return (char*)r;

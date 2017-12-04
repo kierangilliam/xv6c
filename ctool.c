@@ -10,10 +10,19 @@ ctool create ctest1 -p 4 sh ps cat echoloop
 ctool start ctest1 vc0 echoloop 10 ab
 */ 
 
-// TODO: do a giant diff on xv6 and xv6c to find all differences
-// TODO: Clean up tab space formatting of modified files
-// TODO: Rewrite comments on proc.c, comment container.c
-// TODO: More than 2 consoles
+/* TODO list: 
+  free - ram
+  df - disk space
+  cinfo
+  ps
+  cpause, cresume, cstop
+  Fair scheduling
+  More than 2 consoles
+  Rewrite comments on proc.c, comment container.c
+  Clean up tab space formatting of modified files
+  Do a giant diff on xv6 and xv6c to find all differences
+  Execute commands inside kernel (cfork and such)
+*/
 
 void 
 usage(char* usage) 

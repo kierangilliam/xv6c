@@ -13,6 +13,6 @@
 #define NBUF         (MAXOPBLOCKS*3)  // size of disk block cache
 #define FSSIZE       1000  // size of file system in blocks
 #define ROOTCONT       1
-#define MAX_CONT_MEM   4096
+#define MAX_CONT_MEM   64*4096*1024
 #define MAX_CONT_DSK   4096
 #define MAX_CONT_PROC  64

@@ -8,10 +8,6 @@
 #include "x86.h"
 #include "container.h"
 #include "proc.h"
-#include "sleeplock.h" // TODO: REmove
-#include "fs.h"// TODO: remove
-#include "file.h" // TODO: remove
-
 
 static struct cont* alloccont(void);
 
@@ -137,16 +133,6 @@ mycont(void) {
 	return currcont;
 }
 
-// struct cont* 	
-// rootcont(void) {
-// 	struct cont *c;
-// 	// TODO: Check to make sure it always inits at first index
-//   	acquire(&ctable.lock);  
-//   	c = &ctable.cont[0];
-//   	release(&ctable.lock);
-//   	return c;
-// }
-
 // Look in the container table for an CUNUSED cont.
 // If found, change state to CEMBRYO
 // Otherwise return 0.
@@ -242,7 +228,6 @@ scheduler(void)
     acquire(&ptable.lock);
     // TODO: do we need to acquire ctable lock too?
 
-	// TODO: Check that scheulde cycles over ctable equally    
     for(i = 0; i < NCONT; i++) {
 
       cont = &ctable.cont[i];
@@ -258,8 +243,6 @@ scheduler(void)
 
 	      if(p->state != RUNNABLE)
 	        continue;
-
-	      cprintf("Running %s\n", p->name);
 
 	      // Switch to chosen process.  It is the process's job
 	      // to release ctable.lock and then reacquire it
@@ -361,6 +344,15 @@ cfork(int cid)
 		return -1;
 
 	return fork(cont);
+}
+
+int 			 
+ckill(struct cont* c) 
+{
+	// mimic kill
+	// call set all processes to killed
+	cprintf("killing container %s\n", c->name);
+	return 0;
 }
 
 //PAGEBREAK: 36
