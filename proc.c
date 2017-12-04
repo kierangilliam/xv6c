@@ -7,9 +7,6 @@
 #include "proc.h"
 #include "spinlock.h"
 #include "container.h"
-#include "fs.h" // TODO: REMOVE
-#include "sleeplock.h"// TODO: REMOVE
-#include "file.h"// TODO: REMOVE
 
 static struct proc *initproc;
 
@@ -110,7 +107,6 @@ initprocess(struct cont* parentcont, char* name, int isroot)
   
   if (isroot) {
     initproc = p;     
-
     inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);      
     memset(p->tf, 0, sizeof(*p->tf));
     p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
@@ -121,6 +117,7 @@ initprocess(struct cont* parentcont, char* name, int isroot)
     p->tf->esp = PGSIZE;
     p->tf->eip = 0;  // beginning of initcode.S
   }
+  
 
   p->sz = PGSIZE;
 
@@ -245,8 +242,8 @@ cfork(struct cont* parentcont)
       // np->cwd = idup(curproc->cwd);
   np->cwd = parentcont->rootdir;
   cprintf("cfork new proc container %s\n", (np->cont->name));
-  cprintf("cfork new proc container rootdir is a folder %d\n", (np->cont->rootdir->type == 1));
-  cprintf("cfork new proc cwd is a folder: %d\n", (np->cwd->type == 1));
+  // cprintf("cfork new proc container rootdir is a folder %d\n", (np->cont->rootdir->type == 1));
+  // cprintf("cfork new proc cwd is a folder: %d\n", (np->cwd->type == 1));
 
   //safestrcpy(np->name, curproc->name, sizeof(curproc->name));
   safestrcpy(np->name, "testproc", sizeof("testproc"));
@@ -379,17 +376,17 @@ forkret(void)
   releasectable();
 
   cprintf("my proc %s\n", myproc()->name);
-  // if (myproc()->cont->state == CREADY) {
-  //   // make runnable and exec current process
-  //   cprintf("%s execing\n", myproc()->name);
-  //   char *argj[4] = { "echoloop", "100", "ab", 0 };
-  //   cprintf("execing proc %s with argv[1] %s\n", argj[0], argj[1]);   
-  //   if (exec(argj[0], argj) == -1) {
-  //     cprintf("exec proc failed\n");
-  //   } else {
-  //     cprintf("exec proc should have worked\n");
-  //   }
-  // }
+  if (myproc()->cont->state == CREADY) {
+    // make runnable and exec current process
+    cprintf("%s execing\n", myproc()->name);
+    char *argj[4] = { "echoloop", "100", "ab", 0 };
+    cprintf("execing proc %s with argv[1] %s\n", argj[0], argj[1]);   
+    if (exec(argj[0], argj) == -1) {
+      cprintf("exec proc failed\n");
+    } else {
+      cprintf("exec proc should have worked\n");
+    }
+  }
 
   if (first) {    
     // Some initialization functions must be run in the context
@@ -453,8 +450,13 @@ wakeup1(void *chan)
   int nproc;
 
   // TODO: maybe remove mycont() function then change this to work
-  nproc = mycont()->mproc;
-  ptable = mycont()->ptable;
+  if (myproc() == 0) {
+    nproc = mycont()->mproc;
+    ptable = mycont()->ptable;
+  } else {
+    nproc = myproc()->cont->mproc;
+    ptable = myproc()->cont->ptable;
+  }
 
   for(p = ptable; p < &ptable[nproc]; p++)
     if(p->state == SLEEPING && p->chan == chan) {

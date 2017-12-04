@@ -646,10 +646,10 @@ namex(char *path, int nameiparent, char *name)
     // TODO: to find out: Root dir for namei('/') is NOT a dir.. why?
   }
 
-  if (strncmp("/ctest1/init", path, strlen("/ctest1/init")) == 0) {
-    cprintf("ip = root now\n");
-    ip = iroot;    
-  }    
+  // if (strncmp("/ctest1/init", path, strlen("/ctest1/init")) == 0) {
+  //   cprintf("ip = root now\n");
+  //   ip = iroot;    
+  // }    
 
   while((path = skipelem(path, name)) != 0){
     ilock(ip);
