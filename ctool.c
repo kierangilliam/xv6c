@@ -7,7 +7,7 @@
 /* 
 Tests:
 ctool create ctest1 -p 4 sh ps cat echoloop
-ctool start ctest1 echoloop ab
+ctool start ctest1 echoloop 10 ab
 */ 
 
 // TODO: do a giant diff on xv6 and xv6c to find all differences
@@ -112,7 +112,7 @@ start(int argc, char *argv[])
 {    
 
   char *args[MAXARG];
-  int i, k, cid;//, pid;
+  int i, k, cid, pid;
 
   if (argc < 4)
     usage("ctool start <name> prog arg1 [arg2 ...]");
@@ -128,10 +128,14 @@ start(int argc, char *argv[])
   if ((cid = cstart(argv[2])) < 0) 
     printf(1, "Failed to start container %s\n", argv[2]);     
 
-  // pid = cfork(cid);
+  pid = cfork(cid);
 
-  // if (pid == 0) 
-  //   exec(args[0], args);
+  if (pid == 0) {
+    printf(1, "child\n");
+    exec(args[0], args);
+  } else {
+    printf(1, "parent\n");
+  }
 }
 
 void

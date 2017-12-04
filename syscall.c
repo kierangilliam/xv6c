@@ -106,6 +106,7 @@ extern int sys_uptime(void);
 extern int sys_getticks(void);
 extern int sys_ccreate(void);
 extern int sys_cstart(void);
+extern int sys_cfork(void);
 extern int sys_cstop(void);
 extern int sys_cpause(void);
 extern int sys_cinfo(void);
@@ -136,6 +137,7 @@ static int (*syscalls[])(void) = {
 [SYS_ccreate] sys_ccreate,
 [SYS_cpause] sys_cpause,
 [SYS_cstart] sys_cstart,
+[SYS_cfork] sys_cfork,
 [SYS_cstop] sys_cstop,
 [SYS_cinfo] sys_cinfo,
 };

@@ -25,5 +25,6 @@ struct cont {
 	char name[16];          	// Container name
 	struct proc *ptable;		// Table of processes owned by container
 	int nextproc;				// Next proc to sched TODO: change or make more elegant
+	int nextpid;
 };
 

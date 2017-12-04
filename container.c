@@ -257,6 +257,21 @@ scheduler(void)
   }
 }
 
+struct cont*
+cidtocont(cid)
+{
+	struct cont* c;
+	int i;
+
+	for (i = 0; i < NCONT; i++) {
+		c = &ctable.cont[i];
+		if (c->cid == cid)
+			return c;
+	}
+
+	return 0;
+}
+
 // TODO: Block processes inside non root containers from ccreating
 int 
 ccreate(char* name, int mproc, uint msz, uint mdsk)
@@ -320,6 +335,17 @@ found:
 	release(&ctable.lock);
 	
 	return nc->cid;
+}
+
+int
+cfork(int cid)
+{
+	struct cont* cont;
+
+	if ((cont = cidtocont(cid)) == 0)
+		return -1;
+
+	return fork(cont);
 }
 
 //PAGEBREAK: 36

@@ -26,6 +26,7 @@ int uptime(void);
 int getticks(void);
 int ccreate(char*, int, uint, uint);
 int cstart(char*);
+int cfork(int);
 int cstop(void);
 int cinfo(void);
 int cpause(void);

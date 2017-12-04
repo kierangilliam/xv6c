@@ -10,7 +10,7 @@
 int
 sys_fork(void)
 {
-  return fork();
+  return fork(0);
 }
 
 int

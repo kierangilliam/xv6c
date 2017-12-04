@@ -119,13 +119,13 @@ void             scheduler(void) __attribute__((noreturn));
 void             sched(void);
 int 			 ccreate(char*, int, uint, uint);
 int 			 cstart(char*);
+int 			 cfork(int);
 void             contdump(void);
 
 // proc.c
 struct proc*	initprocess(struct cont*);
 void            exit(void);
-int             fork(void);
-struct proc* 	cfork(struct cont*);
+int             fork(struct cont*);
 struct proc*    allocproc(struct cont*);
 int             growproc(int);
 int             kill(int);

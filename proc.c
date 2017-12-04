@@ -10,7 +10,6 @@
 
 static struct proc *initproc;
 
-int nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -56,7 +55,7 @@ allocproc(struct cont *parentcont)
 
 found:
   p->state = EMBRYO;
-  p->pid = nextpid++;  
+  p->pid = parentcont->nextpid++;  
 
   releasectable();  
 
@@ -158,15 +157,29 @@ growproc(int n)
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
+// Pass in 0 to exactly fork current process
 int
-fork(void)
+fork(struct cont* parentcont)
 {
   int i, pid;
-  struct proc *np;
-  struct proc *curproc = myproc();
+  struct proc *np, *curproc, *parent;
+  struct cont *cont;
+  struct inode *cwd;
+
+  curproc = myproc();
+
+  if (parentcont == 0) {
+    cwd = curproc->cwd;
+    cont = myproc()->cont;
+    parent = curproc;
+  } else {
+    cwd = parentcont->rootdir;
+    cont = parentcont;
+    parent = initproc;
+  }
 
   // Allocate process.
-  if((np = allocproc(curproc->cont)) == 0){
+  if((np = allocproc(cont)) == 0){
     return -1;
   }
 
@@ -178,7 +191,7 @@ fork(void)
     return -1;
   }
   np->sz = curproc->sz;
-  np->parent = curproc;
+  np->parent = parent;
   *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
@@ -187,7 +200,7 @@ fork(void)
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
-  np->cwd = idup(curproc->cwd);
+  np->cwd = idup(cwd);
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
@@ -200,55 +213,6 @@ fork(void)
   releasectable();
 
   return pid;
-}
-
-// TODO: Delete
-struct proc*
-cfork(struct cont* parentcont)
-{
-  //int i;
-  struct proc *np;
-  struct proc *curproc = myproc();
-
-  // Allocate process.
-  if((np = allocproc(parentcont)) == 0){
-    return 0;
-  }
-
-  // Copy process state from proc.
-  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
-    kfree(np->kstack);
-    np->kstack = 0;
-    np->state = UNUSED;
-    return 0;
-  }
-  np->sz = curproc->sz;
-  np->parent = curproc;
-  *np->tf = *curproc->tf;
-
-  // Clear %eax so that fork returns 0 in the child.
-  np->tf->eax = 0;
-
-  // If parent cont is the same as curproc
-      // for(i = 0; i < NOFILE; i++)
-      //   if(curproc->ofile[i])
-      //     np->ofile[i] = filedup(curproc->ofile[i]);
-      // np->cwd = idup(curproc->cwd);
-  np->cwd = parentcont->rootdir;
-  cprintf("cfork new proc container %s\n", (np->cont->name));
-  // cprintf("cfork new proc container rootdir is a folder %d\n", (np->cont->rootdir->type == 1));
-  // cprintf("cfork new proc cwd is a folder: %d\n", (np->cwd->type == 1));
-
-  //safestrcpy(np->name, curproc->name, sizeof(curproc->name));
-  safestrcpy(np->name, "testproc", sizeof("testproc"));
-
-  acquirectable();
-
-  np->state = RUNNABLE;
-
-  releasectable();
-
-  return np;
 }
 
 // Exit the current process.  Does not return.

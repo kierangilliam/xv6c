@@ -24,5 +24,6 @@
 #define SYS_ccreate  23
 #define SYS_cstop    24
 #define SYS_cstart   25
-#define SYS_cinfo    26
-#define SYS_cpause   27
+#define SYS_cfork   26
+#define SYS_cinfo    27
+#define SYS_cpause   28

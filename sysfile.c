@@ -481,6 +481,19 @@ sys_cstart(void)
   return cstart(name);
 }
 
+int 
+sys_cfork(void)
+{
+  int cid;
+  
+  if(argint(0, &cid) < 0) {
+    cprintf("sys_ccfork: Error getting pointers\n");
+    return -1;
+  }
+
+  return cfork(cid);
+}
+
 int
 sys_cstop(void)
 {
