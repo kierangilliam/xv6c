@@ -265,17 +265,30 @@ scheduler(void)
 }
 
 struct cont*
-cidtocont(cid)
+cid2cont(int cid)
 {
 	struct cont* c;
 	int i;
 
 	for (i = 0; i < NCONT; i++) {
 		c = &ctable.cont[i];
-		if (c->cid == cid)
+		if (c->cid == cid && c->state != CUNUSED)
 			return c;
 	}
+	return 0;
+}
 
+struct cont*
+name2cont(char* name)
+{
+	struct cont* c;
+	int i;
+
+	for (i = 0; i < NCONT; i++) {
+		c = &ctable.cont[i];
+		if (strncmp(name, c->name, strlen(name)) == 0 && c->state != CUNUSED)
+			return c;
+	}
 	return 0;
 }
 
@@ -283,16 +296,24 @@ cidtocont(cid)
 int 
 ccreate(char* name, int mproc, uint msz, uint mdsk)
 {
-	// TODO: check to make sure there are no containers with the same name
 	struct cont *nc;
 	struct inode* rootdir;
+
+	// TODO: Test these checks
+	if (name2cont(name))
+		return -1;
+
+	if (mproc > MAX_CONT_PROC || msz > MAX_CONT_MEM || mdsk > MAX_CONT_DSK)
+		return -1;
 
 	// Allocate container.
 	if ((nc = alloccont()) == 0)
 		return -1;
 
-	if ((rootdir = namei(name)) == 0)
+	if ((rootdir = namei(name)) == 0) {
+		nc->state = CUNUSED;
 		return -1;
+	}
 
 	// TODO: Do we need this? could cause a "sched
 	// locks" problem if we acquire the ctable then
@@ -340,7 +361,7 @@ cfork(int cid)
 {
 	struct cont* cont;
 
-	if ((cont = cidtocont(cid)) == 0)
+	if ((cont = cid2cont(cid)) == 0)
 		return -1;
 
 	return fork(cont);

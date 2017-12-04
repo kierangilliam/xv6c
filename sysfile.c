@@ -448,10 +448,6 @@ sys_pipe(void)
 int
 sys_ccreate(void)
 {
-  // TODO: Validate arguments (less than size of MAX, > 0 etc)
-  // ccreate(char* name, int mproc, uint msz, uint mdsk)
-  //           0             1             2      3
-
   char *name;
   int mproc;
   uint msz, mdsk;
