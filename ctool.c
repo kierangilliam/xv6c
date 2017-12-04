@@ -73,7 +73,6 @@ max(int a, int b)
     return b;
 }
 
-// ctool create ctest1 -p 4 sh ps cat echoloop
 void
 create(int argc, char *argv[])
 {
@@ -138,8 +137,10 @@ start(int argc, char *argv[])
 
   // TODO: Null terminate args?
 
-  if ((cid = cstart(argv[2])) < 0) 
+  if ((cid = cstart(argv[2])) < 0) {
     printf(1, "Failed to start container %s\n", argv[2]);     
+    exit();
+  }
 
   pid = cfork(cid);
 
@@ -180,7 +181,28 @@ stop(int argc, char *argv[])
 void
 info(int argc, char *argv[])
 {
-  
+  // for (i = 0; i < NCONT; i++) {
+  //   c = ci->conts[i];
+  //   if (c.state == CUNUSED) 
+  //     continue;
+
+  //   cprintf("\nContainer %d: %s\n", c.cid, c.name);
+
+  //   for (k = 0; k < c.mproc; k++) {
+
+  //     p = c.procs[k]; 
+
+  //     if(p.state == UNUSED)
+  //       continue;
+
+  //     if(p.state >= 0 && p.state < NELEM(states) && states[p.state])
+  //       state = states[p.state];      
+  //     else
+  //       state = "???";
+
+  //     cprintf("\t%d %s %s\n", p.pid, state, p.name);
+  //   } 
+  // }
 }
 
 int

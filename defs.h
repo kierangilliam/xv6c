@@ -9,6 +9,7 @@ struct spinlock;
 struct sleeplock;
 struct stat;
 struct superblock;
+struct continfo;
 
 // bio.c
 void            binit(void);
@@ -120,6 +121,7 @@ void             scheduler(void) __attribute__((noreturn));
 void             sched(void);
 int 			 ccreate(char*, int, uint, uint);
 int 			 cstart(char*);
+int 			 cinfo(struct continfo*);
 int 			 ckill(struct cont*);
 int 			 cfork(int);
 void             contdump(void);

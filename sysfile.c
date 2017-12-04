@@ -10,6 +10,7 @@
 #include "stat.h"
 #include "mmu.h"
 #include "proc.h"
+#include "continfo.h"
 #include "fs.h"
 #include "spinlock.h"
 #include "sleeplock.h"
@@ -497,7 +498,11 @@ sys_cstop(void)
 int
 sys_cinfo(void)
 {
-  return 1;
+  struct continfo *ci;
+
+  if(argptr(0, (void*)&ci, sizeof(*ci)) < 0)
+    return -1;
+  return cinfo(ci);
 }
 
 int

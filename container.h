@@ -15,6 +15,8 @@ extern int ncpu;
 
 enum contstate { CUNUSED, CEMBRYO, CREADY, CRUNNABLE, CPAUSED, CRUNNING };
 
+// TODO: Add in local pids
+
 struct cont {
 	uint msz;					// Max size of memory (bytes)
 	uint mdsk;					// Max amount of disk space (bytes)
@@ -28,4 +30,3 @@ struct cont {
 	struct proc *ptable;		// Table of processes owned by container
 	int nextproc;				// Next proc to sched TODO: change or make more elegant
 };
-

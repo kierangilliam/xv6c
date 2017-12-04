@@ -8,6 +8,7 @@
 #include "x86.h"
 #include "container.h"
 #include "proc.h"
+#include "continfo.h"
 
 static struct cont* alloccont(void);
 
@@ -100,7 +101,7 @@ initcontainer(void)
 
 	acquire(&ctable.lock);
 	c->mproc = mproc;
-	c->msz = msz;
+	c->msz = msz; // SET TO MAXES FOUND IN MAIN.C
 	c->mdsk = mdsk;	
 	c->state = CRUNNABLE;	
 	c->rootdir = idup(rootdir);
@@ -356,6 +357,64 @@ found:
 	return nc->cid;
 }
 
+/*
+struct pinfo {
+ 	enum procinfostate state;        // Process state
+ 	int pid;                     // Process ID
+  	char name[16];               // Process name 
+};
+*/
+
+int 
+cinfo(struct continfo* ci) 
+{
+	int i, k, j, l;
+	struct cont *c;
+	struct proc *p;
+
+	j = 0;
+
+	ci->root = myproc()->cont->cid == ROOTCONT;
+
+	acquirectable();
+	for(i = 0; i < NCONT; i++) {
+
+		c = &ctable.cont[i];
+
+		// If root container, fill all container information	
+		// Else, fill only first ci->conts index
+		if (myproc()->cont->cid != ROOTCONT || c->state == CUNUSED)
+			continue;		 	
+
+		ci->conts[j].msz = c->msz;
+		ci->conts[j].mdsk = c->mdsk;
+		ci->conts[j].mproc = c->mproc;
+		ci->conts[j].usz = c->upg * 4096;
+		ci->conts[j].udsk = c->udsk;
+		ci->conts[j].cid = c->cid;		
+		ci->conts[j].state = c->state;
+		safestrcpy(ci->conts[j].name, c->name, sizeof(c->name));			
+
+	  	for (k = 0, l = 0; k < c->mproc; k++) {
+	  
+	  		p = &c->ptable[k]; 
+
+	    	if(p->state == UNUSED)
+		    	continue;
+
+		 	ci->conts[j].procs[l].pid = l;	 // TODO: Change?	   
+		 	ci->conts[j].procs[l].state = p->state;		   
+		 	safestrcpy(ci->conts[j].procs[l].name, p->name, sizeof(p->name));			
+		 	l++;		   
+	    }
+
+	    j++;
+	}
+	releasectable();
+
+	return 1;
+}
+
 int
 cfork(int cid)
 {
@@ -403,12 +462,11 @@ contdump(void)
 	for(i = 0; i < NCONT; i++) {
 
 	  c = &ctable.cont[i];
-	  k = 0;
 
 	  if (c->state == CUNUSED)
 	  	continue;      
 
-	  cprintf("\nContainer %d: %s\n", i, c->name);
+	  cprintf("\nContainer %d: %s\n", c->cid, c->name);
 
 	  for (k = 0; k < c->mproc; k++) {
 	  
