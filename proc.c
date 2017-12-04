@@ -13,7 +13,7 @@ static struct proc *initproc;
 extern void forkret(void);
 extern void trapret(void);
 
-static void wakeup1(void *chan);
+int nextpid = 1;
 
 // Disable interrupts so that we are not rescheduled
 // while reading proc from the cpu structure
@@ -55,7 +55,7 @@ allocproc(struct cont *parentcont)
 
 found:
   p->state = EMBRYO;
-  p->pid = parentcont->nextpid++;  
+  p->pid = nextpid++;  
 
   releasectable();  
 
@@ -91,7 +91,7 @@ found:
 // set the sz and pgdir for the initialized process
 struct proc*
 initprocess(struct cont* parentcont)
-{
+{  
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
@@ -110,12 +110,11 @@ initprocess(struct cont* parentcont)
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
   p->tf->eip = 0;  // beginning of initcode.S
-  
 
   p->sz = PGSIZE;
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
-  p->cwd = parentcont->rootdir;
+  p->cwd = idup(parentcont->rootdir);
 
   // Set initial process's cont to root
   p->cont = parentcont;
@@ -170,7 +169,7 @@ fork(struct cont* parentcont)
 
   if (parentcont == 0) {
     cwd = curproc->cwd;
-    cont = myproc()->cont;
+    cont = curproc->cont;
     parent = curproc;
   } else {
     cwd = parentcont->rootdir;
@@ -207,9 +206,7 @@ fork(struct cont* parentcont)
   pid = np->pid;
 
   acquirectable();
-
   np->state = RUNNABLE;
-
   releasectable();
 
   return pid;
@@ -382,31 +379,6 @@ sleep(void *chan, struct spinlock *lk)
     releasectable();
     acquire(lk);
   }
-}
-
-//PAGEBREAK!
-// Wake up all processes sleeping on chan.
-// The ctable lock must be held.
-static void
-wakeup1(void *chan)
-{
-  struct proc *p;
-  struct proc *ptable;
-  int nproc;
-
-  // TODO: maybe remove mycont() function then change this to work
-  if (myproc() == 0) {
-    nproc = mycont()->mproc;
-    ptable = mycont()->ptable;
-  } else {
-    nproc = myproc()->cont->mproc;
-    ptable = myproc()->cont->ptable;
-  }
-
-  for(p = ptable; p < &ptable[nproc]; p++)
-    if(p->state == SLEEPING && p->chan == chan) {
-      p->state = RUNNABLE;
-    }
 }
 
 // Wake up all processes sleeping on chan.

@@ -11,6 +11,7 @@
 int
 exec(char *path, char **argv)
 {  
+  // cprintf("exec %s\n", path);
   char *s, *last;
   int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
@@ -21,14 +22,18 @@ exec(char *path, char **argv)
   struct proc *curproc = myproc();
 
   begin_op();
+  // cprintf("exec %s2\n", path);
 
   if((ip = namei(path)) == 0){
+    // cprintf("exec %s3\n", path);
     end_op();
-    cprintf("exec: fail\n");
+    // cprintf("exec: fail\n");
     return -1;
   }
+  // cprintf("exec %s4\n", path);
   ilock(ip);
   pgdir = 0;
+  // cprintf("exec %s5\n", path);
 
   // Check ELF header
   if(readi(ip, (char*)&elf, 0, sizeof(elf)) != sizeof(elf))

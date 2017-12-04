@@ -106,6 +106,7 @@ int             pipewrite(struct pipe*, char*, int);
 struct inode* create(char *path, short type, short major, short minor);
 
 //container.c
+void			 wakeup1(void *);
 int              cpuid(void);
 struct cpu*      mycpu(void);
 void             userinit(void);

@@ -623,6 +623,57 @@ skipelem(char *path, char *name)
 // If parent != 0, return the inode for the parent and copy the final
 // path element into name, which must have room for DIRSIZ bytes.
 // Must be called inside a transaction since it calls iput().
+// static struct inode*
+// namex(char *path, int nameiparent, char *name)
+// {
+//   struct inode *ip, *next;
+  
+//   cprintf("namex begin %s with proc %s \n", path, ((myproc() == 0) ? "null" : myproc()->name));
+
+//   if(*path == '/')
+//     ip = iget(ROOTDEV, ROOTINO);
+//   else
+//     ip = idup(myproc()->cwd);
+
+//   while((path = skipelem(path, name)) != 0){
+//     cprintf("\there0\n");
+//     ilock(ip);
+//     cprintf("\there1\n");
+//     if(ip->type != T_DIR){
+//       iunlockput(ip);
+//       cprintf("\treturn 0\n");
+//       return 0;
+//     }
+//     cprintf("\there2\n");
+//     if(nameiparent && *path == '\0'){
+//       // Stop one level early.
+//       iunlock(ip);
+//       cprintf("\treturn ip\n");
+//       return ip;
+//     }
+//     cprintf("\there3\n");
+//     if((next = dirlookup(ip, name, 0)) == 0){
+//       iunlockput(ip);
+//       cprintf("\treturn 0\n");
+//       return 0;
+//     }
+//     cprintf("\there4\n");
+//     iunlockput(ip);
+//     ip = next;
+//   }
+//   if(nameiparent){
+//     iput(ip);
+//     cprintf("\treturn 0\n");
+//     return 0;
+//   }
+//   cprintf("\treturn ip\n");
+//   return ip;
+// }
+
+// Look up and return the inode for a path name.
+// If parent != 0, return the inode for the parent and copy the final
+// path element into name, which must have room for DIRSIZ bytes.
+// Must be called inside a transaction since it calls iput().
 static struct inode*
 namex(char *path, int nameiparent, char *name)
 {
@@ -630,8 +681,8 @@ namex(char *path, int nameiparent, char *name)
 
   iroot = iget(ROOTDEV, ROOTINO);
   
-  cprintf("namex begin %s with proc %s \n", path, ((myproc() == 0) ? "null" : myproc()->name));
-  cprintf("\tiroot is type folder %d\n", (iroot->type == T_DIR));    
+  // cprintf("namex begin %s with proc %s \n", path, ((myproc() == 0) ? "null" : myproc()->name));
+  // cprintf("\tiroot is type folder %d\n", (iroot->type == T_DIR));    
 
   // Absolute or relative
   if (myproc() == 0)
@@ -639,43 +690,49 @@ namex(char *path, int nameiparent, char *name)
   else if(*path == '/') 
     ip = idup(myproc()->cont->rootdir);
   else {    
-    ip = idup(myproc()->cwd);
-    cprintf("\tip = myproc's cwd (which is also it's container)%d\n", (myproc()->cwd->inum == myproc()->cont->rootdir->inum));
-    cprintf("\tip is type folder %d\n", (ip->type == T_DIR));    
-    cprintf("\trootdir is type folder %d\n", (myproc()->cont->rootdir->type == T_DIR));    
+    ip = idup(myproc()->cwd);    
+    // cprintf("\tip = myproc's cwd (which is also it's container) %d\n", (myproc()->cwd->inum == myproc()->cont->rootdir->inum));
+    // cprintf("\tip is type folder %d\n", (ip->type == T_DIR));    
+    // cprintf("\trootdir is type folder %d\n", (myproc()->cont->rootdir->type == T_DIR));    
     // TODO: to find out: Root dir for namei('/') is NOT a dir.. why?
   }
 
   while((path = skipelem(path, name)) != 0){
+    //cprintf("\there0\n");
     ilock(ip);
+    //cprintf("\there1\n");
     if(ip->type != T_DIR){
       iunlockput(ip);
       return 0;
     }
+    //cprintf("\there2\n");
     if(nameiparent && *path == '\0'){
       // Stop one level early.
       iunlock(ip);
       return ip;
     }
+    //cprintf("\there3\n");
     if((next = dirlookup(ip, name, 0)) == 0){
       iunlockput(ip);
       return 0;
     }    
+    //cprintf("\there4\n");
     iunlockput(ip);
     
     // If myproc is running in root container, 
     // or the above (next) folder is not the root folder,
     // then set ip = next
     // TODO: validate that this works
-    if (myproc()->cont->rootdir->inum == iroot->inum || next->inum != iroot->inum)
-      ip = next;
+    // cprintf("we are root: %d \nwe're not trying to acces something in root: %d\n", myproc()->cont->rootdir->inum == iroot->inum, next->inum != iroot->inum);
+    //if (myproc()->cont->rootdir->inum == iroot->inum || next->inum != iroot->inum)
+    ip = next;
   }
   if(nameiparent){
     iput(ip);
     return 0;
   }
-  cprintf("\treturning ip\n");
-  cprintf("\tip is a folder? %d\n", (ip->type == T_DIR));
+  // cprintf("\treturning ip\n");
+  // cprintf("\tip is a folder? %d\n", (ip->type == T_DIR));
   return ip;
 }
 

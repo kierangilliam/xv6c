@@ -32,7 +32,7 @@ main(int argc, char *argv[])
     exit();
   }
 
-  printf(1, "%s started on vc0\n", argv[1]);
+  printf(1, "%s started on console\n", argv[1]);
 
   exit();
 }

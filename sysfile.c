@@ -384,8 +384,6 @@ sys_chdir(void)
   }
   ilock(ip);
   if(ip->type != T_DIR){
-    // TODO: REMOVE
-    cprintf("not a dir\n");
     iunlockput(ip);
     end_op();
     return -1;

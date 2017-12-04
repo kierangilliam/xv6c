@@ -92,10 +92,13 @@ initcontainer(void)
 		msz   = MAX_CONT_MEM,
 		mdsk  = MAX_CONT_DSK;
 	struct cont *c;
+	struct inode *rootdir;
 
-	if ((c = alloccont()) == 0) {
+	if ((c = alloccont()) == 0) 
 		panic("Can't alloc init container.");
-	}
+
+	if ((rootdir = namei("/")) == 0)
+		panic("Can't set '/' as root container's rootdir");
 
 	currcont = c;	
 
@@ -104,7 +107,7 @@ initcontainer(void)
 	c->msz = msz;
 	c->mdsk = mdsk;	
 	c->state = CRUNNABLE;	
-	c->rootdir = namei("/");
+	c->rootdir = idup(rootdir);
 	safestrcpy(c->name, "initcont", sizeof(c->name));	
 
 	// Init pointers to each container's process tables
@@ -170,6 +173,25 @@ found:
 	return c;
 }
 
+// Wake up all processes sleeping on chan.
+// The ctable lock must be held.
+void
+wakeup1(void *chan)
+{
+	struct proc *p;
+	struct cont *cont;
+	int i, k;
+  	// TODO: Wake up may call the wrong channel (chan usually equals min int)  	
+	for(i = 0; i < NCONT; i++) {	  
+	  cont = &ctable.cont[i];	  
+	  for (k = 0; k < cont->mproc; k++) {	  	
+	  	p = &cont->ptable[k];       	  
+	  	if(p->state == SLEEPING && p->chan == chan) 
+      		p->state = RUNNABLE;
+	  }
+	}
+}
+
 // Enter scheduler.  Must hold only ctable.lock
 // and have changed proc->state. Saves and restores
 // intena because intena is a property of this
@@ -226,7 +248,7 @@ scheduler(void)
       cont = &ctable.cont[i];
 
       if (cont->state != CRUNNABLE)
-      	continue;            
+      	continue;                  
 
       for (k = (cont->nextproc % cont->mproc); k < cont->mproc; k++) {
       	
@@ -236,6 +258,8 @@ scheduler(void)
 
 	      if(p->state != RUNNABLE)
 	        continue;
+
+	      cprintf("Running %s\n", p->name);
 
 	      // Switch to chosen process.  It is the process's job
 	      // to release ctable.lock and then reacquire it
@@ -294,7 +318,7 @@ ccreate(char* name, int mproc, uint msz, uint mdsk)
 	nc->mproc = mproc;
 	nc->msz = msz;
 	nc->mdsk = mdsk;
-	nc->rootdir = rootdir;
+	nc->rootdir = idup(rootdir);
 	strncpy(nc->name, name, 16); // TODO: strlen(name) instead of 16?
 	nc->state = CREADY;	
 	release(&ctable.lock);	
@@ -309,31 +333,22 @@ cstart(char* name)
 {		
 	struct cont *nc;
 	int i;
-
-	cprintf("Cstart\n");
-
-	// Find container
+	
 	acquire(&ctable.lock);
 
+	// Find container
 	for (i = 0; i < NCONT; i++) {
 		nc = &ctable.cont[i];
 		if (strncmp(name, nc->name, strlen(name)) == 0 && nc->state == CREADY)
 			goto found;
 	}
 
-	cprintf("No free container with name %s\n", name);
 	release(&ctable.lock);
 	return -1;
 
 found: 	
-
-	cprintf("\tFound container to run (%s)\n", nc->name);
-
-	// TODO: Attach to a vc
-
-	nc->state = CREADY;	
-	release(&ctable.lock);
-	
+	nc->state = CRUNNABLE;	
+	release(&ctable.lock);	
 	return nc->cid;
 }
 
@@ -355,38 +370,36 @@ cfork(int cid)
 void
 contdump(void)
 {
-  static char *states[] = {
-  [UNUSED]    "unused",
-  [EMBRYO]    "embryo",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
-  };
-  int i, k, nextproc;
-  struct cont *c;
-  struct proc *p;
-  char *state;
-  uint pc[10];
+	static char *states[] = {
+	[UNUSED]    "unused",
+	[EMBRYO]    "embryo",
+	[SLEEPING]  "sleep ",
+	[RUNNABLE]  "runble",
+	[RUNNING]   "run   ",
+	[ZOMBIE]    "zombie"
+	};
 
-  cprintf("Contdump()\n");
-  cprintf("cont 2 p[0] %s %s\n", ctable.cont[1].ptable[0].name, states[ctable.cont[1].ptable[0].state]);
+	int i, k, j;
+	struct cont *c;
+	struct proc *p;
+	char *state;
+	uint pc[10];
 
-  acquirectable();
+	acquirectable();
 
-  for(i = 0; i < NCONT; i++) {
+	for(i = 0; i < NCONT; i++) {
 
-      c = &ctable.cont[i];
-      nextproc = 0, k = 0;
+	  c = &ctable.cont[i];
+	  k = 0;
 
-      if (c->state == CUNUSED)
-      	continue;
+	  if (c->state == CUNUSED)
+	  	continue;      
 
-      for (k = (nextproc % c->mproc); k < c->mproc; k++) {
-      
-      	p = &c->ptable[k]; 
+	  cprintf("\nContainer %d: %s\n", i, c->name);
 
-      	nextproc++;
+	  for (k = 0; k < c->mproc; k++) {
+	  
+	  	p = &c->ptable[k]; 
 
 	    if(p->state == UNUSED)
 		    continue;
@@ -394,15 +407,15 @@ contdump(void)
 	      state = states[p->state];
 	    else
 	      state = "???";
-	    cprintf("container: %s. %d %s %s", p->cont->name, p->pid, state, p->name);
+	    cprintf("\t%d %s %s", p->pid, state, p->name);
 	    if(p->state == SLEEPING){
 	      getcallerpcs((uint*)p->context->ebp+2, pc);
-	      for(i=0; i<10 && pc[i] != 0; i++)
-	        cprintf(" %p", pc[i]);
+	      for(j=0; j<10 && pc[j] != 0; j++)
+	        cprintf(" %p", pc[j]);
 	    }
 	    cprintf("\n");
 	  }
-  }
+	}
 
-  releasectable();
+	releasectable();
 }

@@ -7,13 +7,13 @@
 /* 
 Tests:
 ctool create ctest1 -p 4 sh ps cat echoloop
-ctool start ctest1 echoloop 10 ab
+ctool start ctest1 vc0 echoloop 10 ab
 */ 
 
 // TODO: do a giant diff on xv6 and xv6c to find all differences
 // TODO: Clean up tab space formatting of modified files
 // TODO: Rewrite comments on proc.c, comment container.c
-// TODO: try tickstest()
+// TODO: More than 2 consoles
 
 void 
 usage(char* usage) 
@@ -76,7 +76,6 @@ create(int argc, char *argv[])
   if (argc < 4)
     usage("create <name> [-p <max_processes>] [-m <max_memory>] [-d <max_disk>] prog [prog2.. ]");
 
-
   for (i = 0; i < argc; i++) {
     if (strcmp(argv[i], "-p") == 0) {
       last_flag = max(last_flag, i + 1);
@@ -106,18 +105,23 @@ create(int argc, char *argv[])
   }  
 }
 
-// ctool start <name> prog arg1 [arg2 ...]
+// ctool start <name> <vc> prog arg1 [arg2 ...]
 void
 start(int argc, char *argv[])
 {    
 
   char *args[MAXARG];
-  int i, k, cid, pid;
+  int i, k, cid, pid, vc;
 
-  if (argc < 4)
-    usage("ctool start <name> prog arg1 [arg2 ...]");
+  if (argc < 5)
+    usage("ctool start <name> <vc> prog arg1 [arg2 ...]");
 
-  for (i = 3, k = 0; i < argc; i++, k++) {
+  if ((vc = open(argv[3], O_RDWR)) == -1) {
+    printf(1, "Couldn't open virtual console %s", argv[3]);
+    exit();
+  } 
+
+  for (i = 4, k = 0; i < argc; i++, k++) {
     args[k] = malloc(strlen(argv[i]) + 1);     
     memmove(args[k], argv[i], strlen(argv[i])); 
     memmove(args[k] + strlen(argv[i]), "\0", 1);
@@ -130,11 +134,19 @@ start(int argc, char *argv[])
 
   pid = cfork(cid);
 
-  if (pid == 0) {
-    printf(1, "child\n");
+  if (pid == 0){
+    close(0);
+    close(1);
+    close(2);
+    dup(vc);
+    dup(vc);
+    dup(vc);
     exec(args[0], args);
+    printf(1, "Failed to start process %s on container\n", args[0]);
+    // TODO: Kill container
+    exit();
   } else {
-    printf(1, "parent\n");
+    printf(1, "Starting container %s on vc %s\n", argv[2], argv[3]);
   }
 }
 
