@@ -117,7 +117,7 @@ struct cont*     mycont(void);
 void             cinit(void);
 void             scheduler(void) __attribute__((noreturn));
 void             sched(void);
-int 			 ccreate(char*, char**, int, int, uint, uint);
+int 			 ccreate(char*, int, uint, uint);
 int 			 cstart(char*, char**, int);
 void             contdump(void);
 

@@ -450,42 +450,22 @@ sys_pipe(void)
 int
 sys_ccreate(void)
 {
-  // TODO: Validate arguments
-  //ccreate(char* name, char** progv, int progc, int mproc, uint msz, uint mdsk)
-  //        0             1             2            3         4           5
+  // TODO: Validate arguments (less than size of MAX, > 0 etc)
+  // ccreate(char* name, int mproc, uint msz, uint mdsk)
+  //           0             1             2      3
 
-  char *name, *argv[MAXARG];
-  int i, progc, mproc;
-  uint uargv, uarg, msz, mdsk;
+  char *name;
+  int mproc;
+  uint msz, mdsk;
 
-  if(argstr(0, &name) < 0 || argint(2, &progc) < 0 || argint(3, &mproc) < 0 
-    || argint(4, (int*)&msz) < 0 || argint(5, (int*)&mdsk) < 0) {
+  if(argstr(0, &name) < 0 || argint(1, &mproc) < 0  || argint(2, (int*)&msz) < 0 || argint(3, (int*)&mdsk) < 0) {
     cprintf("sys_ccreate: Error getting pointers\n");
     return -1;
   }
 
-  if(argint(1, (int*)&uargv) < 0){
-    return -1;
-  }
-  memset(argv, 0, sizeof(argv));
-  for(i=0;; i++){
-    if(i >= NELEM(argv))
-      return -1;
-    if(fetchint(uargv+4*i, (int*)&uarg) < 0)
-      return -1;
-    if(uarg == 0){
-      argv[i] = 0;
-      break;
-    }
-    if(fetchstr(uarg, &argv[i]) < 0)
-      return -1;
-  }
-
-  cprintf("sys_create\nuargv: %d\nname: %s\nmproc: %d\nmsz: %d\nmdsk: %d\n", uargv, name, mproc, msz, mdsk);
-  for (i = 0; i < progc; i++) 
-    cprintf("\t%s\n", argv[i]);
+  cprintf("sys_create params:\n\tname: %s\n\tmproc: %d\n\tmsz: %d\n\tmdsk: %d\n", name, mproc, msz, mdsk);
   
-  return ccreate(name, argv, progc, mproc, msz, mdsk);
+  return ccreate(name, mproc, msz, mdsk);
 }
 
 int

@@ -225,7 +225,7 @@ scheduler(void)
 
       cont = &ctable.cont[i];
 
-      if (cont->state != CRUNNABLE && cont->state != CREADY)
+      if (cont->state != CRUNNABLE)
       	continue;            
 
       for (k = (cont->nextproc % cont->mproc); k < cont->mproc; k++) {
@@ -236,12 +236,6 @@ scheduler(void)
 
 	      if(p->state != RUNNABLE)
 	        continue;
-
-	      if (strncmp("ctest1", cont->name, strlen("ctest1")) == 0 && strncmp("testproc", p->name, strlen("testproc")) == 0) {
-	      	cprintf("\t\tScheduling %s proc %s\n", cont->name, p->name);
-	      }
-			
-
 
 	      // Switch to chosen process.  It is the process's job
 	      // to release ctable.lock and then reacquire it
@@ -265,45 +259,30 @@ scheduler(void)
 
 // TODO: Block processes inside non root containers from ccreating
 int 
-ccreate(char* name, char* progv[MAXARG], int progc, int mproc, uint msz, uint mdsk)
+ccreate(char* name, int mproc, uint msz, uint mdsk)
 {
 	// TODO: check to make sure there are no containers with the same name
-	int i;
 	struct cont *nc;
-	//struct inode *rootdir;
+	struct inode* rootdir;
 
 	// Allocate container.
-	if ((nc = alloccont()) == 0) {
+	if ((nc = alloccont()) == 0)
 		return -1;
-	}
 
-	// // Create a directory (same implementation as sys_mkdir)	
-	// begin_op();
-	// if((rootdir = create(name, T_DIR, 0, 0)) == 0){
-	// 	end_op();
-	// 	cprintf("Unable to create container directory %s\n", name);
-	// 	return -1;
-	// }
-	// iunlockput(rootdir);
-	// end_op();	
+	if ((rootdir = namei(name)) == 0)
+		return -1;
 
-	// TODO: Move files into folder
-	for (i = 0; i < progc; i++) {
-		// if (movefile(name, progv[i]) == 0) 
-		// 	cprintf("Unable to move file %s\n", progv[i]);
-	}
-
+	// TODO: Do we need this? could cause a "sched
+	// locks" problem if we acquire the ctable then
+	// something calls Sched() before releasing
 	acquire(&ctable.lock);
 	nc->mproc = mproc;
 	nc->msz = msz;
 	nc->mdsk = mdsk;
-	nc->rootdir = namei(name); // TODO: Check this with an if
+	nc->rootdir = rootdir;
 	strncpy(nc->name, name, 16); // TODO: strlen(name) instead of 16?
 	nc->state = CREADY;	
 	release(&ctable.lock);	
-
-	cprintf("inited container %s\n", nc->name);
-	cprintf("rootdir is type folder %d\n", (nc->rootdir->type == T_DIR));    
 
 	return 1;  
 }
@@ -378,58 +357,6 @@ found:
 	// }		
 
 	//	release(&ctable.lock);	
-
-	return 1;
-}
-
-
-/* Moves file src to folder dst 
-TODO: Implement */
-int
-movefile(char* dst, char* src) {
-	
-	int pathsize = sizeof(dst) + sizeof(src) + 2; // dst.len + '\' + src.len + \0
-	char path[pathsize]; 
-	// struct file *f;
-	// struct inode *ip;
-
-	memmove(path, dst, strlen(dst));
-	memmove(path + strlen(dst), "/", 1);
-	memmove(path + strlen(dst) + 1, src, strlen(src));
-	memmove(path + strlen(dst) + 1 + strlen(src), "\0", 1);
-
-	cprintf("movefile path: %s\n", path);
-
-	// begin_op();
-	
-	// ip = create(path, T_FILE, 0, 0);
-	// if(ip == 0){
- //  		end_op();
- //  		cprintf("movefile: Error opening file %s\n", path);
- //  		return -1;
-	// } 
-
-	// if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
-	// 	if(f)
-	// 	  fileclose(f);
-	// 	iunlockput(ip);
-	// 	end_op();
-	// 	cprintf("movefile: Error allocating file %s\n", path);
-	// 	return -1;
-	// }
-	// iunlock(ip);
-	// end_op();
-
-	// f->type = FD_INODE;
-	// f->ip = ip;
-	// f->off = 0;
-	// f->readable = !(O_CREATE & O_WRONLY);
-	// f->writable = (O_CREATE & O_WRONLY) || (O_CREATE & O_RDWR);
-
-	// // Copy contents of src into new file
-	// char* source;
-	// fileread();	
-
 
 	return 1;
 }

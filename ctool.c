@@ -5,6 +5,7 @@
 #include "fcntl.h" 
 
 /* 
+Tests:
 ctool create ctest1 -p 4 sh ps cat echoloop
 ctool start ctest1 echoloop ab
 */ 
@@ -12,6 +13,7 @@ ctool start ctest1 echoloop ab
 // TODO: do a giant diff on xv6 and xv6c to find all differences
 // TODO: Clean up tab space formatting of modified files
 // TODO: Rewrite comments on proc.c, comment container.c
+// TODO: try tickstest()
 
 void 
 usage(char* usage) 
@@ -21,9 +23,7 @@ usage(char* usage)
 }
 
 // Modified implementation of 
-// https://stackoverflow.com/
-// questions/33792754/
-// in-c-on-linux-how-would-you-implement-cp
+// https://stackoverflow.com/questions/33792754/in-c-on-linux-how-would-you-implement-cp
 int
 cp(char* dst, char* file)
 {  
@@ -65,13 +65,10 @@ max(int a, int b)
 }
 
 // ctool create ctest1 -p 4 sh ps cat echoloop
-// folder/ container name, what to copy into folder
-// mkdir, cp file 1, cp file n  
 void
 create(int argc, char *argv[])
 {
-  char *progv[MAXARG];
-  int i, k, progc, last_flag = 2, // No flags
+  int i, k, last_flag = 2, // No flags
   mproc = MAX_CONT_PROC, 
   msz = MAX_CONT_MEM, 
   mdsk = MAX_CONT_DSK;  
@@ -95,35 +92,21 @@ create(int argc, char *argv[])
     }
   }
 
-  progc = argc - last_flag - 1;
-
   mkdir(argv[2]);
 
-  printf(1, "name: %s\nmproc: %d\nmsz: %d\nmdsk: %d\nprogc: %d\n", argv[2], mproc, msz, mdsk, progc);
+  for (i = last_flag + 1, k = 0; i < argc; i++, k++) {
+    if (cp(argv[2], argv[i]) != 1) 
+      printf(1, "Failed to copy %s into folder %s. Continuing...\n", argv[i], argv[2]);
+  }  
 
-  if (ccreate(argv[2], progv, progc, mproc, msz, mdsk) == 1) {
+  if (ccreate(argv[2], mproc, msz, mdsk) == 1) {
     printf(1, "Created container %s\n", argv[2]); 
   } else {
     printf(1, "Failed to create container %s\n", argv[2]); 
-  }
-
-  // TODO: delete init after cstarting
-  cp(argv[2], "init");
-
-  for (i = last_flag + 1, k = 0; i < argc; i++, k++) {
-
-    // TODO: move this into the kernel or the rest of ccreate out of the kernel
-    if (cp(argv[2], argv[i]) != 1) 
-      printf(1, "Failed to copy %s into folder %s. Continuing...\n", argv[i], argv[2]);
-    
-    // If we were using kernel for ccreate sys call
-    // Change size of to strlen
-    // progv[k] = malloc(sizeof(argv[i])); memmove(progv[k], argv[i], sizeof(argv[i])); memmove(progv[k] + sizeof(argv[i]), "\0", 1); printf(1, "\t%s\n", progv[k]);
   }  
 }
 
 // ctool start <name> prog arg1 [arg2 ...]
-// ctool start ctest1 echoloop ab
 void
 start(int argc, char *argv[])
 {    

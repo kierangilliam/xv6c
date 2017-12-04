@@ -375,19 +375,6 @@ forkret(void)
   // Still holding ctablelock from scheduler.
   releasectable();
 
-  cprintf("my proc %s\n", myproc()->name);
-  if (myproc()->cont->state == CREADY) {
-    // make runnable and exec current process
-    cprintf("%s execing\n", myproc()->name);
-    char *argj[4] = { "echoloop", "100", "ab", 0 };
-    cprintf("execing proc %s with argv[1] %s\n", argj[0], argj[1]);   
-    if (exec(argj[0], argj) == -1) {
-      cprintf("exec proc failed\n");
-    } else {
-      cprintf("exec proc should have worked\n");
-    }
-  }
-
   if (first) {    
     // Some initialization functions must be run in the context
     // of a regular process (e.g., they call sleep), and thus cannot
