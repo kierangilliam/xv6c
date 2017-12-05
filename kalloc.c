@@ -80,8 +80,9 @@ kfree(char *v)
   r = (struct run*)v;
   r->next = kmem.freelist;
   kmem.freelist = r;
-  if (userinited)
+  if (userinited && (c->upg > 0)) { // TODO: Write a test to make sure this can't be exploited (c->upg>0)
     c->upg--;
+  }
   if(kmem.use_lock)
     release(&kmem.lock);
 }
@@ -99,6 +100,7 @@ kalloc(void)
     c = myproc()->cont;
       // Check if container is over allowed memory limits
     if((c->upg * PGSIZE + PGSIZE) > c->msz) {
+      cprintf("Killing container %d for trying to allocate %d * %d + %d memory.\n", myproc()->cont->cid, c->upg,PGSIZE,PGSIZE);
       ckill(myproc()->cont);
       return 0;
     }

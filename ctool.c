@@ -8,6 +8,9 @@
 Tests:
 ctool create ctest1 -p 4 sh ps cat echoloop
 ctool start ctest1 vc0 echoloop 10 ab
+(40,000,000)
+ctool create ctest2 -m 40000000 sh df free
+ctool start ctest2 vc0 sh
 */ 
 
 /* TODO list: 
@@ -99,7 +102,10 @@ create(int argc, char *argv[])
     }
   }
 
-  mkdir(argv[2]);
+  if (mkdir(argv[2]) != 0) {
+    printf(1, "Error creating directory %s\n", argv[2]);
+    exit();
+  }
 
   for (i = last_flag + 1, k = 0; i < argc; i++, k++) {
     if (cp(argv[2], argv[i]) != 1) 
@@ -110,6 +116,7 @@ create(int argc, char *argv[])
     printf(1, "Created container %s\n", argv[2]); 
   } else {
     printf(1, "Failed to create container %s\n", argv[2]); 
+    exit();
   }  
 }
 
@@ -181,6 +188,15 @@ stop(int argc, char *argv[])
 void
 info(int argc, char *argv[])
 {
+  /*
+  It will show each container
+  The name of the container
+  The directory associated with the container
+  The max number of processes, the max amount of memory allocated, and the max disk space allocated
+  The amount of used/available processes, memory, and disk space
+  The processes running in the container
+  The execution statistics and percent of CPU consumed by each process and each container
+  */
   // for (i = 0; i < NCONT; i++) {
   //   c = ci->conts[i];
   //   if (c.state == CUNUSED) 
