@@ -59,6 +59,16 @@ balloc(uint dev)
 {
   int b, bi, m;
   struct buf *bp;
+  struct cont* c;
+
+  c = myproc()->cont;
+
+  // Can container allocate more blocks?
+  if((c->ubl * BSIZE + BSIZE) > c->mdsk) {
+      cprintf("Killing container %d for trying to allocate %d * %d + %d disk space.\n", myproc()->cont->cid, c->ubl,PGSIZE,PGSIZE);
+      ckill(myproc()->cont);
+      return 0;
+  }  
 
   bp = 0;
   for(b = 0; b < sb.size; b += BPB){
@@ -70,6 +80,7 @@ balloc(uint dev)
         log_write(bp);
         brelse(bp);
         bzero(dev, b + bi);
+        c->ubl++;
         return b + bi;
       }
     }
@@ -84,6 +95,12 @@ bfree(int dev, uint b)
 {
   struct buf *bp;
   int bi, m;
+  struct cont* c;
+
+  c = myproc()->cont;
+
+  if (c->ubl > 0)
+    c->ubl--;
 
   readsb(dev, &sb);
   bp = bread(dev, BBLOCK(b, sb));

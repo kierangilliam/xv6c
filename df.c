@@ -13,6 +13,8 @@ main(int argc, char *argv[])
 	struct cinfo c;
 	int i;
 
+	// TODO: Walk pgdir for available space
+
 	ci = malloc(sizeof(*ci));
 	
 	if (cinfo(ci) != 1) {
@@ -20,9 +22,6 @@ main(int argc, char *argv[])
 		exit();
 	}
 
-	// TODO: Use super block for max disk space
-
-	// TODO: CHANGE TO ONLY SHOW FIRST CONTAINER (need to set root max mem and dsk to global max mem and disk)
 	// We would have access to more than one container if we were the root
 	// Not in root, it should only show the available and used memory within a container
 	for (i = 0; i < NCONT; i++) {
@@ -30,8 +29,8 @@ main(int argc, char *argv[])
 		if (c.state == CIUNUSED) 
 			continue;
 
-		printf(1, "Container %d: %s\n", i, c.name);
-		printf(1, "\tMemory: %dmb/%dmb (Used/ Available)\n", c.usz/1024/1024, c.msz/1024/1024);
+		printf(1, "Container %d: %s\n", c.cid, c.name);
+		printf(1, "\tDisk: %dkb/%dkb/%dmb (Used/ Available/ Max)\n", c.udsk/1024, (c.mdsk/1024 - c.udsk/1024), c.mdsk/1024/1024);
 	}
 
 	exit();

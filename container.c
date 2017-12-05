@@ -9,6 +9,7 @@
 #include "container.h"
 #include "proc.h"
 #include "continfo.h"
+#include "fs.h"
 
 static struct cont* alloccont(void);
 
@@ -352,6 +353,8 @@ cstart(char* name)
 	return -1;
 
 found: 	
+	// TODO: Walk containers directory to see available memory, set c->ubl to that if its not over its limit
+
 	nc->state = CRUNNABLE;	
 	release(&ctable.lock);	
 	return nc->cid;
@@ -381,8 +384,8 @@ cinfo(struct continfo* ci)
 		ci->conts[j].msz = c->msz;
 		ci->conts[j].mdsk = c->mdsk;
 		ci->conts[j].mproc = c->mproc;
-		ci->conts[j].usz = c->upg * 4096;
-		ci->conts[j].udsk = c->udsk;
+		ci->conts[j].usz = c->upg * PGSIZE;
+		ci->conts[j].udsk = c->ubl * BSIZE;
 		ci->conts[j].cid = c->cid;		
 		ci->conts[j].state = c->state;
 		safestrcpy(ci->conts[j].name, c->name, sizeof(c->name));			
@@ -395,6 +398,8 @@ cinfo(struct continfo* ci)
 		    	continue;
 
 		 	ci->conts[j].procs[l].pid = l;	 // TODO: Change?	   
+		 	ci->conts[j].procs[l].ticks = p->ticks;
+		 	cprintf("%s ticks %d\n", p->name, p->ticks);
 		 	ci->conts[j].procs[l].state = p->state;		   
 		 	safestrcpy(ci->conts[j].procs[l].name, p->name, sizeof(p->name));			
 		 	l++;		   
