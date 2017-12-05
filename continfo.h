@@ -3,9 +3,10 @@ enum continfostate { CIUNUSED, CIEMBRYO, CIREADY, CIRUNNABLE, CIPAUSED, CIRUNNIN
 
 // Information of a process
 struct pinfo {
- 	enum procinfostate state;        // Process state
+ 	enum procinfostate state;    // Process state
  	int pid;                     // Process ID
   	char name[16];               // Process name 
+  	uint ticks;					 // N Ticks ran on CPU
 };
 
 // Information of a single container

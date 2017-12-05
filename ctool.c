@@ -3,6 +3,7 @@
 #include "user.h"
 #include "param.h"
 #include "fcntl.h" 
+#include "continfo.h"
 
 /* 
 Tests:
@@ -14,16 +15,19 @@ ctool start ctest2 vc0 sh
 */ 
 
 /* TODO list: 
-  free - ram
   df - disk space
   cinfo
   ps
   cpause, cresume, cstop
+  Set root mproc to NPROC, 
+    msz to max memory, 
+    mdsk to max disk (superblock?)
   Fair scheduling
   More than 2 consoles
+  kfree called too many times
+  ticks not tracking properly
   Rewrite comments on proc.c, comment container.c
   Clean up tab space formatting of modified files
-  Do a giant diff on xv6 and xv6c to find all differences
   Execute commands inside kernel (cfork and such)
 */
 
@@ -186,46 +190,92 @@ stop(int argc, char *argv[])
 }
 
 void
-info(int argc, char *argv[])
+info()
 {
+  struct continfo *ci;
+  struct cinfo c;
+  struct pinfo p;
+  int i, k, uproc, numstates, totalticks, contticks;
+  char* state;
+
+  static char *states[] = {
+    [PIUNUSED]    "unused",
+    [PIEMBRYO]    "embryo",
+    [PISLEEPING]  "sleep ",
+    [PIRUNNABLE]  "runble",
+    [PIRUNNING]   "run   ",
+    [PIZOMBIE]    "zombie"
+    };
+
+  numstates = 6;
+
+  ci = malloc(sizeof(*ci));
+
+  if (cinfo(ci) != 1) {
+    printf(1, "info: failed to get container info\n");
+    exit();
+  }
+
+  // Count total ticks
+  for (i = 0; i < NCONT; i++) {
+    c = ci->conts[i];
+    if (c.state == CIUNUSED) 
+      continue;    
+    for (k = 0; k < c.mproc; k++) {
+      p = c.procs[k];
+      if(p.state == PIUNUSED)
+        continue;
+      totalticks += p.ticks;
+    }  
+  }
+
   /*
-  It will show each container
-  The name of the container
-  The directory associated with the container
-  The max number of processes, the max amount of memory allocated, and the max disk space allocated
-  The amount of used/available processes, memory, and disk space
-  The processes running in the container
-  The execution statistics and percent of CPU consumed by each process and each container
+  TODO: The execution statistics and percent of CPU consumed by each process and each container
   */
-  // for (i = 0; i < NCONT; i++) {
-  //   c = ci->conts[i];
-  //   if (c.state == CUNUSED) 
-  //     continue;
+  for (i = 0; i < NCONT; i++) {
+    c = ci->conts[i];
+    if (c.state == CIUNUSED) 
+      continue;
 
-  //   cprintf("\nContainer %d: %s\n", c.cid, c.name);
+    // Count used processes and contticks
+    for (k = 0, uproc = 0, contticks = 0; k < c.mproc; k++) {
+      p = c.procs[k];
+      if(p.state == PIUNUSED)
+        continue;
+      uproc++;
+      contticks += p.ticks;
+    }      
 
-  //   for (k = 0; k < c.mproc; k++) {
+    printf(1, "Container %d: %s (/%s)\n", c.cid, c.name, c.name);
+    printf(1, "\tExecuted %d%% (%d/%d) of the time\n", (contticks/totalticks*100), contticks, totalticks);
+    printf(1, "\t\tUsed\tAvailable\n");
+    printf(1, "\tProc: \t%d\t%d\n\tMem: \t%dkb\t%dmb\n\tDisk: \t%dkb\t%dmb\n", 
+      uproc, c.mproc, c.usz/1024, c.msz/1024/1024, c.udsk/1024, c.mdsk/1024/1024);
+    printf(1, "\tProcesses:\n");
 
-  //     p = c.procs[k]; 
+    for (k = 0; k < c.mproc; k++) {
 
-  //     if(p.state == UNUSED)
-  //       continue;
+      p = c.procs[k]; 
 
-  //     if(p.state >= 0 && p.state < NELEM(states) && states[p.state])
-  //       state = states[p.state];      
-  //     else
-  //       state = "???";
+      if(p.state == PIUNUSED)
+        continue;
 
-  //     cprintf("\t%d %s %s\n", p.pid, state, p.name);
-  //   } 
-  // }
+      if(p.state >= 0 && p.state < numstates && states[p.state])
+        state = states[p.state];      
+      else
+        state = "???";
+
+      printf(1, "\t\t%d %s %s \t(%d%% CPU time)\n", p.pid, state, p.name, p.ticks/totalticks*100);
+    } 
+    printf(1, "\n");
+  }
 }
 
 int
 main(int argc, char *argv[])
 {
 
-  if (argc < 3) {
+  if (argc == 1) {
     usage("<tool> <cmd> [<arg> ...]");
     exit();
   }
@@ -234,6 +284,8 @@ main(int argc, char *argv[])
     create(argc, argv);
   else if (strcmp(argv[1], "start") == 0)
     start(argc, argv);
+  else if (strcmp(argv[1], "info") == 0)
+    info();
   else 
     printf(1, "ctool: command not found.\n");   
 
