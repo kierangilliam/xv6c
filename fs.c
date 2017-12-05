@@ -623,57 +623,6 @@ skipelem(char *path, char *name)
 // If parent != 0, return the inode for the parent and copy the final
 // path element into name, which must have room for DIRSIZ bytes.
 // Must be called inside a transaction since it calls iput().
-// static struct inode*
-// namex(char *path, int nameiparent, char *name)
-// {
-//   struct inode *ip, *next;
-  
-//   cprintf("namex begin %s with proc %s \n", path, ((myproc() == 0) ? "null" : myproc()->name));
-
-//   if(*path == '/')
-//     ip = iget(ROOTDEV, ROOTINO);
-//   else
-//     ip = idup(myproc()->cwd);
-
-//   while((path = skipelem(path, name)) != 0){
-//     cprintf("\there0\n");
-//     ilock(ip);
-//     cprintf("\there1\n");
-//     if(ip->type != T_DIR){
-//       iunlockput(ip);
-//       cprintf("\treturn 0\n");
-//       return 0;
-//     }
-//     cprintf("\there2\n");
-//     if(nameiparent && *path == '\0'){
-//       // Stop one level early.
-//       iunlock(ip);
-//       cprintf("\treturn ip\n");
-//       return ip;
-//     }
-//     cprintf("\there3\n");
-//     if((next = dirlookup(ip, name, 0)) == 0){
-//       iunlockput(ip);
-//       cprintf("\treturn 0\n");
-//       return 0;
-//     }
-//     cprintf("\there4\n");
-//     iunlockput(ip);
-//     ip = next;
-//   }
-//   if(nameiparent){
-//     iput(ip);
-//     cprintf("\treturn 0\n");
-//     return 0;
-//   }
-//   cprintf("\treturn ip\n");
-//   return ip;
-// }
-
-// Look up and return the inode for a path name.
-// If parent != 0, return the inode for the parent and copy the final
-// path element into name, which must have room for DIRSIZ bytes.
-// Must be called inside a transaction since it calls iput().
 static struct inode*
 namex(char *path, int nameiparent, char *name)
 {
@@ -724,8 +673,8 @@ namex(char *path, int nameiparent, char *name)
     // then set ip = next
     // TODO: validate that this works
     // cprintf("we are root: %d \nwe're not trying to acces something in root: %d\n", myproc()->cont->rootdir->inum == iroot->inum, next->inum != iroot->inum);
-    //if (myproc()->cont->rootdir->inum == iroot->inum || next->inum != iroot->inum)
-    ip = next;
+    if (myproc()->cont->rootdir->inum == iroot->inum || next->inum != iroot->inum)
+      ip = next;
   }
   if(nameiparent){
     iput(ip);
