@@ -25,11 +25,12 @@ main(int argc, char *argv[])
 	// Not in root, it should only show the available and used memory within a container
 	for (i = 0; i < NCONT; i++) {
 		c = ci->conts[i];
+
 		if (c.state == CIUNUSED) 
 			continue;
 
-		printf(1, "Container %d: %s\n", i, c.name);
-		printf(1, "\tMemory: %dmb/%dmb (Used/ Available)\n", c.usz/1024/1024, c.msz/1024/1024);
+		printf(1, "Container %d: %s\n", c.cid, c.name);
+		printf(1, "\tMemory: %dkb/%dmb (Used/ Available)\n", c.usz/1024, c.msz/1024/1024);
 	}
 
 	exit();

@@ -357,14 +357,6 @@ found:
 	return nc->cid;
 }
 
-/*
-struct pinfo {
- 	enum procinfostate state;        // Process state
- 	int pid;                     // Process ID
-  	char name[16];               // Process name 
-};
-*/
-
 int 
 cinfo(struct continfo* ci) 
 {
@@ -383,7 +375,7 @@ cinfo(struct continfo* ci)
 
 		// If root container, fill all container information	
 		// Else, fill only first ci->conts index
-		if (myproc()->cont->cid != ROOTCONT || c->state == CUNUSED)
+		if ((myproc()->cont->cid != ROOTCONT && myproc()->cont->cid != c->cid) || c->state == CUNUSED)
 			continue;		 	
 
 		ci->conts[j].msz = c->msz;
