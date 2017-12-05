@@ -457,8 +457,6 @@ sys_ccreate(void)
     cprintf("sys_ccreate: Error getting pointers\n");
     return -1;
   }
-
-  cprintf("sys_create params:\n\tname: %s\n\tmproc: %d\n\tmsz: %d\n\tmdsk: %d\n", name, mproc, msz, mdsk);
   
   return ccreate(name, mproc, msz, mdsk);
 }

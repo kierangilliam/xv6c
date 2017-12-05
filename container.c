@@ -435,6 +435,13 @@ ckill(struct cont* c)
 	return 0;
 }
 
+int 
+cpause(int cid)
+{
+	// Save its old state to resume on cresume
+	return 1;
+}
+
 //PAGEBREAK: 36
 // Print a process listing of current container to console.  For debugging.
 // Runs when user types ^P on console.
