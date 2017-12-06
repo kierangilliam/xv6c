@@ -51,8 +51,6 @@ struct {
 	struct proc proc[NCONT][NPROC];
 } ptable; 
 
-struct cont *currcont;
-
 int nextcid = 1;
 
 void
@@ -84,8 +82,6 @@ initcontainer(void)
 
 	if ((rootdir = namei("/")) == 0)
 		panic("Can't set '/' as root container's rootdir");
-
-	currcont = c;	
 
 	acquire(&ctable.lock);
 	c->mproc = mproc;
@@ -286,6 +282,7 @@ name2cont(char* name)
 	return 0;
 }
 
+// Creates a container with the maximum procs, mem, and disk size
 int 
 ccreate(char* name, int mproc, uint msz, uint mdsk)
 {
@@ -323,6 +320,7 @@ ccreate(char* name, int mproc, uint msz, uint mdsk)
 	return 1;  
 }
 
+// Sets a container to be scheduled
 int
 cstart(char* name) 
 {		
@@ -363,6 +361,8 @@ found:
 	return nc->cid;
 }
 
+// Returns continfo struct of each container 
+// the current running process has access to
 int 
 cinfo(struct continfo* ci) 
 {
@@ -414,6 +414,8 @@ cinfo(struct continfo* ci)
 	return 1;
 }
 
+// Forks a process into container "cid"
+// TODO: Change to accept name instead of cid
 int
 cfork(int cid)
 {
@@ -425,6 +427,8 @@ cfork(int cid)
 	return fork(cont);
 }
 
+// Sets container to CSTOPPING
+// Scheduler runs processes as killed
 int 			 
 ckill(struct cont* c) 
 {
@@ -435,6 +439,7 @@ ckill(struct cont* c)
 	return 1;
 }
 
+// Called if a container has no used processes
 static int 
 cexit(struct cont* c)
 {
@@ -454,6 +459,9 @@ cexit(struct cont* c)
 	return 1;
 }
 
+// Wraps user level call,
+// does a few permission checks
+// before killing a container
 int 
 cstop(char* name)
 {
@@ -473,6 +481,7 @@ cstop(char* name)
 	return ckill(c);
 }
 
+// Pauses a container from being scheduled
 int 
 cpause(char* name)
 {
@@ -496,6 +505,7 @@ cpause(char* name)
 	return 1;
 }
 
+// Resumes a container and sets to CRUNNABLE
 int 
 cresume(char* name)
 {
@@ -519,9 +529,8 @@ cresume(char* name)
 	return 1;
 }
 
-// Print a process listing of current container to console.  For debugging.
+// Print a process listing of containers to console.  For debugging.
 // Runs when user types ^P on console.
-// No lock to avoid wedging a stuck machine further.
 void
 contdump(void)
 {
