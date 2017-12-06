@@ -11,26 +11,30 @@ ctool create ctest1 -p 4 sh ps cat echoloop
 ctool start ctest1 vc0 sh
 
 ctool create ctest2 -m 40000000 sh df free
-ctool start ctest2 vc0 sh
+ctool start ctest2 vc1 sh
 
 ctool create ctest3 -d 100000 sh ps free
-ctool start ctest3 vc1 sh
+ctool start ctest3 vc2 sh
 
 ctool create ctest4 sh ps echoloop
-ctool start ctest4 vc2 echoloop a b
+ctool start ctest4 vc3 echoloop a b
 */ 
 
-/* TODO list: 
+/* TODO list:     
+  cpause, cresume, cstop  
+  ps
+  Set root msz to max memory, 
+    mdsk to max disk (superblock?)  
+  Benson tests
+  ctool auto tests?
+
+  cinfo: df/free 
+    make max disk and max memory = new function maxmem() and maxdisk()
+      min(maxmem(), c->msz)
+
   1 page talk about how I achieved 
     isolation for disk, proc, mem
-  ctool auto tests?
-  ps
-  cpause, cresume, cstop
-  More than 2 consoles
-  Set root mproc to NPROC, 
-    msz to max memory, 
-    mdsk to max disk (superblock?)  
-  Add more blocks?
+
   kfree called too many times
   Rewrite comments on proc.c, comment container.c
   Clean up tab space formatting of modified files
@@ -169,7 +173,7 @@ start(int argc, char *argv[])
     dup(vc);
     exec(args[0], args);
     printf(1, "Failed to start process %s on container\n", args[0]);
-    // TODO: Kill container
+    cstop(argv[2]);
     exit();
   } else {
     printf(1, "Starting container %s on vc %s\n", argv[2], argv[3]);
@@ -179,19 +183,37 @@ start(int argc, char *argv[])
 void
 pause(int argc, char *argv[])
 {
+  if (argc < 2)
+    usage("ctool pause <name>");
   
+  if (cpause(argv[2]))
+    printf(1, "Paused %s\n", argv[2]);
+  else
+    printf(1, "ctool: pause failed\n");
 }
 
 void
 resume(int argc, char *argv[])
 {
+  if (argc < 2)
+    usage("ctool resume <name>");
   
+  if (cresume(argv[2]))
+    printf(1, "Resumed %s\n", argv[2]);
+  else
+    printf(1, "ctool: resume failed\n");
 }
 
 void
 stop(int argc, char *argv[])
 {
+  if (argc < 2)
+    usage("ctool stop <name>");
   
+  if (cstop(argv[2]))
+    printf(1, "Stopped %s\n", argv[2]);
+  else
+    printf(1, "ctool: stop failed\n");
 }
 
 void
@@ -291,6 +313,12 @@ main(int argc, char *argv[])
     start(argc, argv);
   else if (strcmp(argv[1], "info") == 0)
     info();
+  else if (strcmp(argv[1], "resume") == 0)
+    resume(argc, argv);
+  else if (strcmp(argv[1], "stop") == 0)
+    stop(argc, argv);
+  else if (strcmp(argv[1], "pause") == 0)
+    pause(argc, argv);
   else 
     printf(1, "ctool: command not found.\n");   
 

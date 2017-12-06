@@ -124,6 +124,9 @@ int 			 ccreate(char*, int, uint, uint);
 int 			 cstart(char*);
 int 			 cinfo(struct continfo*);
 int 			 ckill(struct cont*);
+int 			 cstop(char*);
+int 			 cresume(char*);
+int 			 cpause(char*);
 int 			 cfork(int);
 void             contdump(void);
 

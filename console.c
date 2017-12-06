@@ -261,7 +261,7 @@ consoleintr(int (*getc)(void))
     contdump();  // now call procdump() wo. cons.lock held
   }
   if(doconsoleswitch){
-    cprintf("\nActive console now: %d\n", active);
+    cprintf("\n\nActive console now: %d", active);
   }
 }
 

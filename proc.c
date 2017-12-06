@@ -41,6 +41,9 @@ allocproc(struct cont *parentcont)
   struct proc *ptable;
   int nproc;
 
+  if (parentcont->state != CRUNNABLE && parentcont->state != CRUNNING) 
+    return 0;
+
   acquireptable();
 
   ptable = parentcont->ptable;
@@ -82,6 +85,7 @@ found:
 
   p->ticks = 0;
   p->cont = parentcont;
+  p->cont->uproc++;
 
   return p;
 }
@@ -95,10 +99,11 @@ initprocess(struct cont* parentcont)
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
-  p = allocproc(parentcont);
+  if ((p = allocproc(parentcont)) == 0) 
+    panic("initprocess: failed to alloc initproc");
 
   if((p->pgdir = setupkvm()) == 0) 
-    panic("userinit: out of memory?");
+    panic("initprocess: out of memory?");
   
   initproc = p;     
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);      
@@ -255,6 +260,8 @@ exit(void)
         wakeup1(initproc);
     }
   }
+
+  curproc->cont->uproc--;
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;

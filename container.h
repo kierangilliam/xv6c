@@ -13,9 +13,14 @@ struct cpu {
 extern struct cpu cpus[NCPU];
 extern int ncpu;
 
-enum contstate { CUNUSED, CEMBRYO, CREADY, CRUNNABLE, CPAUSED, CRUNNING };
-
-// TODO: Add in local pids
+enum contstate { CUNUSED, CEMBRYO, CREADY, CRUNNABLE, CRUNNING, CPAUSED, CSTOPPING };
+				 // CUNUSED:   Ready to allocate
+				 // CEMBRYO:   Allocated, ready to be created
+				 // CREADY:    Ready to start
+				 // CRUNNABLE: Ready to be scheduled
+				 // CRUNNING:  Currently running container
+				 // CPAUSED:   Paused, will resume as CRUNNABLE
+				 // CSTOPPING: Run processes until all are UNUSED
 
 struct cont {
 	uint msz;					// Max size of memory (bytes)
@@ -23,10 +28,11 @@ struct cont {
 	int mproc;					// Max amount of processes	
 	int upg;					// Used pages of memory
 	uint udsk;					// Used disk space (blocks)
+	int uproc;					// Used processes
 	int cid;					// Container ID
 	struct inode *rootdir;		// Root directory
 	enum contstate state;		// State of container
 	char name[16];          	// Container name
 	struct proc *ptable;		// Table of processes owned by container
-	int nextproc;				// Next proc to sched TODO: change or make more elegant
+	int nextproc;				// Next proc to sched 	
 };

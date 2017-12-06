@@ -13,6 +13,8 @@
 
 static struct cont* alloccont(void);
 
+static int  		cexit(struct cont* c);
+
 // TODO: Check to make sure ALL ctable calls have a lock
 
 // Must be called with interrupts disabled
@@ -218,7 +220,7 @@ scheduler(void)
 
       cont = &ctable.cont[i];
 
-      if (cont->state != CRUNNABLE)
+      if (cont->state != CRUNNABLE && cont->state != CSTOPPING) // TODO: remove CSTOPPING?
       	continue;                  
 
       for (k = (cont->nextproc % cont->mproc); k < cont->mproc; k++) {
@@ -229,6 +231,14 @@ scheduler(void)
 
 	      if(p->state != RUNNABLE)
 	        continue;
+
+	      // Kill processes
+	      if (cont->state == CSTOPPING) {
+	        p->killed = 1;
+		    // Wake process from sleep if necessary.
+		    if(p->state == SLEEPING)
+		      p->state = RUNNABLE;
+	      }
 
 	      // Switch to chosen process.  It is the process's job
 	      // to release ctable.lock and then reacquire it
@@ -243,6 +253,10 @@ scheduler(void)
 	      // Process is done running for now.
 	      // It should have changed its p->state before coming back.
 	      c->proc = 0;
+	      
+	      // Check if all processes are exited
+	      if (cont->uproc == 0)	 
+	      	cexit(cont);
 	  }
     }
     releaseptable();
@@ -278,17 +292,18 @@ name2cont(char* name)
 	return 0;
 }
 
-// TODO: Block processes inside non root containers from ccreating
 int 
 ccreate(char* name, int mproc, uint msz, uint mdsk)
 {
 	struct cont *nc;
 	struct inode* rootdir;
 
-	// TODO: Test these checks
+	// Check if container name already exists
 	if (name2cont(name))
 		return -1;
 
+	// Check if wanted resources surpass available
+	// TODO: Change with maxmem() etc
 	if (mproc > NPROC || msz > MAX_CONT_MEM || mdsk > MAX_CONT_DSK)
 		return -1;
 
@@ -296,6 +311,7 @@ ccreate(char* name, int mproc, uint msz, uint mdsk)
 	if ((nc = alloccont()) == 0)
 		return -1;
 
+	// Check if we are root
 	if ((rootdir = namei(name)) == 0) {
 		nc->state = CUNUSED;
 		return -1;
@@ -316,8 +332,6 @@ ccreate(char* name, int mproc, uint msz, uint mdsk)
 	return 1;  
 }
 
-// Allocates a process for the table "name"
-// Runs argv[0] (argv is program plus arguments)
 int
 cstart(char* name) 
 {		
@@ -340,20 +354,13 @@ cstart(char* name)
 
 found: 	
 
-	/*
-	TODO: Check left space and disk and proc
-	total = 220mb
-	root = 150mb
-	c1max = 120mb
-	c1max = c1max - (total - root)
-	*/
-
 	rootdir = nc->rootdir;
+	// TODO: use max mem instead of mdsk
 	mdsk = nc->mdsk;
 
 	release(&ctable.lock);	
 
-	// Get current memory used in container folder
+	// Get current memory used in container folder	
 	udsk = dirsize(rootdir, name);
 	if((udsk) < 1 || mdsk < udsk)
 	    return -1;
@@ -430,25 +437,97 @@ cfork(int cid)
 int 			 
 ckill(struct cont* c) 
 {
-	// mimic kill
-	// call set all processes to killed
-	cprintf("killing container %s\n", c->name);
-	return 0;
+	cprintf("Killing container %s\n", c->name);
+
+	acquire(&ctable.lock);
+	c->state = CSTOPPING;
+	release(&ctable.lock);
+	
+	return 1;
 }
 
-int 
-cpause(int cid)
+static int 
+cexit(struct cont* c)
 {
-	// Check if root
-	// Save its old state to resume on cresume
+	cprintf("Exiting container %s\n", c->name);
+	acquire(&ctable.lock);
+	c->name[0] = 0;
+	c->msz = 0;
+	c->mdsk = 0;
+	c->mproc = 0;
+	c->upg = 0;
+	c->udsk = 0;
+	c->rootdir = 0;
+	c->nextproc = 0;
+	c->cid = 0;
+	c->state = CUNUSED;	
+	release(&ctable.lock);
+
 	return 1;
 }
 
 int 
-cresume(int cid)
+cstop(char* name)
 {
-	// Check if root
-	// Save its old state to resume on cresume
+	struct cont *c;
+
+	// Check if we are root
+	if (myproc()->cont->cid != ROOTCONT) 
+		return -1;
+
+	// Check if container name already exists
+	if ((c = name2cont(name)) == 0)
+		return -1;
+
+	if (c->state != CRUNNABLE)
+		return -1;	
+
+	return ckill(c);
+}
+
+int 
+cpause(char* name)
+{
+	struct cont *c;
+
+	// Check if we are root
+	if (myproc()->cont->cid != ROOTCONT) 
+		return -1;
+
+	// Check if container name already exists
+	if ((c = name2cont(name)) == 0)
+		return -1;
+
+	if (c->state != CRUNNABLE)
+		return -1;
+	
+	acquire(&ctable.lock);
+	c->state = CPAUSED;
+	release(&ctable.lock);
+
+	return 1;
+}
+
+int 
+cresume(char* name)
+{
+	struct cont *c;	
+
+	// Check if we are root
+	if (myproc()->cont->cid != ROOTCONT) 
+		return -1;
+
+	// Check if container name already exists
+	if ((c = name2cont(name)) == 0)
+		return -1;
+
+	if (c->state != CPAUSED)
+		return -1;
+	
+	acquire(&ctable.lock);
+	c->state = CRUNNABLE;
+	release(&ctable.lock);
+
 	return 1;
 }
 
