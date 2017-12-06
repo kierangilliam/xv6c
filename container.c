@@ -85,7 +85,7 @@ initcontainer(void)
 
 	acquire(&ctable.lock);
 	c->mproc = mproc;
-	c->msz = msz; // TODO: SET TO MAXES FOUND IN MAIN.C
+	c->msz = msz; // TODO: Set to maxes (maxmem(), maxdsk())
 	c->mdsk = mdsk;	
 	c->state = CRUNNABLE;	
 	c->rootdir = idup(rootdir);
@@ -294,7 +294,7 @@ ccreate(char* name, int mproc, uint msz, uint mdsk)
 		return -1;
 
 	// Check if wanted resources surpass available
-	// TODO: Change with maxmem() etc
+	// TODO: Change with maxmem(), maxdsk()
 	if (mproc > NPROC || msz > MAX_CONT_MEM || mdsk > MAX_CONT_DSK)
 		return -1;
 
@@ -344,7 +344,7 @@ cstart(char* name)
 found: 	
 
 	rootdir = nc->rootdir;
-	// TODO: use max mem instead of mdsk
+	// TODO: use min(maxmem(), mdsk)
 	mdsk = nc->mdsk;
 
 	release(&ctable.lock);	
