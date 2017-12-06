@@ -150,8 +150,6 @@ start(int argc, char *argv[])
     memmove(args[k] + strlen(argv[i]), "\0", 1);
   }
 
-  // TODO: Null terminate args?
-
   if ((cid = cstart(argv[2])) < 0) {
     printf(1, "Failed to start container %s\n", argv[2]);     
     exit();

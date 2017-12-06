@@ -15,8 +15,6 @@ static struct cont* alloccont(void);
 
 static int  		cexit(struct cont* c);
 
-// TODO: Check to make sure ALL ctable calls have a lock
-
 // Must be called with interrupts disabled
 int
 cpuid() {
@@ -68,12 +66,9 @@ void acquireptable(void) { acquire(&ptable.lock); }
 
 void releaseptable(void) { release(&ptable.lock); }
 
-struct spinlock*
-ptablelock(void)
-{
-	return &ptable.lock;
-}
+struct spinlock* ptablelock(void) { return &ptable.lock; }
 
+// Initializes first root container
 struct cont*
 initcontainer(void)
 {
@@ -94,7 +89,7 @@ initcontainer(void)
 
 	acquire(&ctable.lock);
 	c->mproc = mproc;
-	c->msz = msz; // SET TO MAXES FOUND IN MAIN.C
+	c->msz = msz; // TODO: SET TO MAXES FOUND IN MAIN.C
 	c->mdsk = mdsk;	
 	c->state = CRUNNABLE;	
 	c->rootdir = idup(rootdir);
@@ -155,7 +150,7 @@ wakeup1(void *chan)
 	struct proc *p;
 	struct cont *cont;
 	int i, k;
-  	// TODO: Wake up may call the wrong channel (chan usually equals min int)  	
+
 	for(i = 0; i < NCONT; i++) {	  
 	  cont = &ctable.cont[i];	  
 	  for (k = 0; k < cont->mproc; k++) {	  	
@@ -214,7 +209,6 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquireptable();
-    // TODO: do we need to acquire ctable lock too?
 
     for(i = 0; i < NCONT; i++) {
 
@@ -317,15 +311,12 @@ ccreate(char* name, int mproc, uint msz, uint mdsk)
 		return -1;
 	}
 
-	// TODO: Do we need this? could cause a "sched
-	// locks" problem if we acquire the ctable then
-	// something calls Sched() before releasing
 	acquire(&ctable.lock);
 	nc->mproc = mproc;
 	nc->msz = msz;
 	nc->mdsk = mdsk;
 	nc->rootdir = idup(rootdir);
-	strncpy(nc->name, name, 16); // TODO: strlen(name) instead of 16?
+	strncpy(nc->name, name, 16);
 	nc->state = CREADY;	
 	release(&ctable.lock);	
 

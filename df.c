@@ -13,8 +13,6 @@ main(int argc, char *argv[])
 	struct cinfo c;
 	int i;
 
-	// TODO: Walk pgdir for available space
-
 	ci = malloc(sizeof(*ci));
 	
 	if (cinfo(ci) != 1) {
