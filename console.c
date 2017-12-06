@@ -33,11 +33,20 @@ static int active = 1;
 
 struct input buf1 = {"", 0, 0, 0};
 struct input buf2 = {"", 0, 0, 0};
+struct input buffers[NCONT];
 
 static struct {
   struct spinlock lock;
   int locking;
 } cons;
+
+static void
+nextconsole() 
+{
+  buffers[active] = input;
+  active = (active+1) % NCONT;  
+  input = buffers[active];  
+}
 
 static void
 printint(int xx, int base, int sign)
@@ -217,17 +226,8 @@ consoleintr(int (*getc)(void))
       // procdump() locks cons.lock indirectly; invoke later
       doprocdump = 1;
       break;
-    case C('T'):  // Process listing.
-      // procdump() locks cons.lock indirectly; invoke later
-      if (active == 1){
-        active = 2;
-        buf1 = input;
-        input = buf2;
-      }else{
-        active = 1;
-        buf2 = input;
-        input = buf1;
-      } 
+    case C('T'):  // Switch console
+      nextconsole();
       doconsoleswitch = 1;
       break;
     case C('U'):  // Kill line.
