@@ -21,7 +21,6 @@ ctool start ctest4 vc3 echoloop a b
 */ 
 
 /* TODO list:     
-  ps
   Set root msz to max memory, 
     mdsk to max disk (superblock?)  
   Benson tests

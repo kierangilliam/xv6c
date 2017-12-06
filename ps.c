@@ -9,27 +9,61 @@
 int
 main(int argc, char *argv[])
 {  
-	struct continfo *ci;
-	struct cinfo c;
-	int i;
+  struct continfo *ci;
+  struct cinfo c;
+  int i;
+  struct pinfo p;
+  int k, numstates;
+  char* state;
 
-	ci = malloc(sizeof(*ci));
-	
-	if (cinfo(ci) != 1) {
-		printf(1, "ps: failed to get container info\n");
-		exit();
-	}
+  ci = malloc(sizeof(*ci));
 
-	// We would have access to more than one container if we were the root
-	// Not in root, it should only show the available and used memory within a container
-	for (i = 0; i < NCONT; i++) {
-		c = ci->conts[i];
-		if (c.state == CIUNUSED) 
-			continue;
+  if (cinfo(ci) != 1) {
+	printf(1, "ps: failed to get container info\n");
+	exit();
+  }
 
-		printf(1, "Container %d: %s\n", c.cid, c.name);
-		printf(1, "\tDisk: %dkb/%dkb/%dmb (Used/ Available/ Max)\n", c.udsk/1024, (c.mdsk/1024 - c.udsk/1024), c.mdsk/1024/1024);
-	}
+  static char *states[] = {
+    [PIUNUSED]    "unused",
+    [PIEMBRYO]    "embryo",
+    [PISLEEPING]  "sleep ",
+    [PIRUNNABLE]  "runble",
+    [PIRUNNING]   "run   ",
+    [PIZOMBIE]    "zombie"
+    };
+
+  numstates = 6;
+
+  ci = malloc(sizeof(*ci));
+
+  if (cinfo(ci) != 1) {
+    printf(1, "info: failed to get container info\n");
+    exit();
+  }
+
+  for (i = 0; i < NCONT; i++) {
+    c = ci->conts[i];
+    if (c.state == CIUNUSED) 
+      continue;
+
+    printf(1, "Container %d (%s) processes:\n", c.cid, c.name);
+
+    for (k = 0; k < c.mproc; k++) {
+
+      p = c.procs[k]; 
+
+      if(p.state == PIUNUSED)
+        continue;
+
+      if(p.state >= 0 && p.state < numstates && states[p.state])
+        state = states[p.state];      
+      else
+        state = "???";
+
+      printf(1, "\t%d %s %s\n", p.pid, state, p.name);
+    } 
+    printf(1, "\n");
+  }
 
 	exit();
 }
