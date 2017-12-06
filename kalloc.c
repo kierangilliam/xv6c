@@ -62,7 +62,7 @@ freerange(void *vstart, void *vend)
 // initializing the allocator; see kinit above.)
 void
 kfree(char *v)
-{
+{  
   struct run *r;
   struct cont *c;
 
