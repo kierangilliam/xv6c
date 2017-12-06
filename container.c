@@ -18,7 +18,7 @@ static int  		cexit(struct cont* c);
 // Must be called with interrupts disabled
 int
 cpuid() {
-  return mycpu()-cpus;
+	return mycpu()-cpus;
 }
 
 // Must be called with interrupts disabled to avoid the caller being
@@ -29,21 +29,21 @@ mycpu(void)
   int apicid, i;
   
   if(readeflags()&FL_IF)
-    panic("mycpu called with interrupts enabled\n");
+	panic("mycpu called with interrupts enabled\n");
   
   apicid = lapicid();
   // APIC IDs are not guaranteed to be contiguous. Maybe we should have
   // a reverse map, or reserve a register to store &cpus[i].
   for (i = 0; i < ncpu; ++i) {
-    if (cpus[i].apicid == apicid)
-      return &cpus[i];
+	if (cpus[i].apicid == apicid)
+	  return &cpus[i];
   }
   panic("unknown apicid\n");
 }
 
 struct {
-  struct spinlock lock;
-  struct cont cont[NCONT];
+	struct spinlock lock;
+	struct cont cont[NCONT];
 } ctable;
 
 struct {
@@ -56,8 +56,8 @@ int nextcid = 1;
 void
 cinit(void)
 {
-  initlock(&ctable.lock, "ctable");
-  initlock(&ptable.lock, "ptable");
+	initlock(&ctable.lock, "ctable");
+	initlock(&ptable.lock, "ptable");
 }
 
 void acquireptable(void) { acquire(&ptable.lock); }
@@ -108,8 +108,8 @@ userinit(void)
 {
 	cprintf("userinit\n");
 	struct cont* root;
-  	root = initcontainer();
-  	initprocess(root);    	
+	root = initcontainer();
+	initprocess(root);    	
 }
 
 // Look in the container table for an CUNUSED cont.
@@ -148,12 +148,12 @@ wakeup1(void *chan)
 	int i, k;
 
 	for(i = 0; i < NCONT; i++) {	  
-	  cont = &ctable.cont[i];	  
-	  for (k = 0; k < cont->mproc; k++) {	  	
-	  	p = &cont->ptable[k];       	  
-	  	if(p->state == SLEEPING && p->chan == chan) 
-      		p->state = RUNNABLE;
-	  }
+		cont = &ctable.cont[i];	  
+		for (k = 0; k < cont->mproc; k++) {	  	
+			p = &cont->ptable[k];       	  
+			if(p->state == SLEEPING && p->chan == chan) 
+				p->state = RUNNABLE;
+		}
 	}
 }
 
@@ -167,20 +167,20 @@ wakeup1(void *chan)
 void
 sched(void)
 {
-  int intena;
-  struct proc *p = myproc();
+	int intena;
+	struct proc *p = myproc();
 
-  if(!holding(ptablelock()))
-    panic("sched ptable.lock");
-  if(mycpu()->ncli != 1) 
-    panic("sched locks");
-  if(p->state == RUNNING)
-    panic("sched running");
-  if(readeflags()&FL_IF)
-    panic("sched interruptible");
-  intena = mycpu()->intena;
-  swtch(&p->context, mycpu()->scheduler);
-  mycpu()->intena = intena;
+	if(!holding(ptablelock()))
+		panic("sched ptable.lock");
+	if(mycpu()->ncli != 1) 
+		panic("sched locks");
+	if(p->state == RUNNING)
+		panic("sched running");
+	if(readeflags()&FL_IF)
+		panic("sched interruptible");
+	intena = mycpu()->intena;
+	swtch(&p->context, mycpu()->scheduler);
+	mycpu()->intena = intena;
 }
 
 // Per-CPU process scheduler.
@@ -193,65 +193,64 @@ sched(void)
 void
 scheduler(void)
 {
-  struct proc *p;
-  struct cont *cont;
-  struct cpu *c = mycpu();
-  int i, k;
-  c->proc = 0;
-  
-  for(;;){
-    // Enable interrupts on this processor.
-    sti();
+	struct proc *p;
+	struct cont *cont;
+	struct cpu *c = mycpu();
+	int i, k;
+	c->proc = 0;
 
-    // Loop over process table looking for process to run.
-    acquireptable();
+	for(;;){
+		// Enable interrupts on this processor.
+		sti();
 
-    for(i = 0; i < NCONT; i++) {
+		// Loop over process table looking for process to run.
+		acquireptable();
 
-      cont = &ctable.cont[i];
+		for(i = 0; i < NCONT; i++) {
 
-      if (cont->state != CRUNNABLE && cont->state != CSTOPPING) 
-      	continue;                  
+			cont = &ctable.cont[i];
 
-      for (k = (cont->nextproc % cont->mproc); k < cont->mproc; k++) {
-      	
-      	  p = &cont->ptable[k];       	  
+			if (cont->state != CRUNNABLE && cont->state != CSTOPPING) 
+				continue;                  
 
-      	  cont->nextproc = cont->nextproc + 1;
+			for (k = (cont->nextproc % cont->mproc); k < cont->mproc; k++) {
 
-	      if(p->state != RUNNABLE)
-	        continue;
+				p = &cont->ptable[k];       	  
 
-	      // Kill processes
-	      if (cont->state == CSTOPPING) {
-	        p->killed = 1;
-		    // Wake process from sleep if necessary.
-		    if(p->state == SLEEPING)
-		      p->state = RUNNABLE;
-	      }
+				cont->nextproc = cont->nextproc + 1;
 
-	      // Switch to chosen process.  It is the process's job
-	      // to release ctable.lock and then reacquire it
-	      // before jumping back to us.
-	      c->proc = p;
-	      switchuvm(p);
-	      p->state = RUNNING;
+				if(p->state != RUNNABLE)
+					continue;
 
-	      swtch(&(c->scheduler), p->context); 
-	      switchkvm();
+				// Kill processes
+				if (cont->state == CSTOPPING) {
+					p->killed = 1;
+					// Wake process from sleep if necessary.
+					if(p->state == SLEEPING)
+						p->state = RUNNABLE;
+				}
 
-	      // Process is done running for now.
-	      // It should have changed its p->state before coming back.
-	      c->proc = 0;
-	      
-	      // Check if all processes are exited
-	      if (cont->uproc == 0)	 
-	      	cexit(cont);
-	  }
-    }
-    releaseptable();
+				// Switch to chosen process.  It is the process's job
+				// to release ctable.lock and then reacquire it
+				// before jumping back to us.
+				c->proc = p;
+				switchuvm(p);
+				p->state = RUNNING;
 
-  }
+				swtch(&(c->scheduler), p->context); 
+				switchkvm();
+
+				// Process is done running for now.
+				// It should have changed its p->state before coming back.
+				c->proc = 0;
+			  
+				// Check if all processes are exited
+				if (cont->uproc == 0)	 
+					cexit(cont);
+			}
+		}
+		releaseptable();
+	}
 }
 
 struct cont*
@@ -352,10 +351,10 @@ found:
 	// Get current memory used in container folder	
 	udsk = dirsize(rootdir, name);
 	if((udsk) < 1 || mdsk < udsk)
-	    return -1;
+		return -1;
 
 	acquire(&ctable.lock);
-    nc->udsk = udsk;
+	nc->udsk = udsk;
 	nc->state = CRUNNABLE;	
 	release(&ctable.lock);	
 	return nc->cid;
@@ -393,21 +392,21 @@ cinfo(struct continfo* ci)
 		ci->conts[j].state = c->state;
 		safestrcpy(ci->conts[j].name, c->name, sizeof(c->name));			
 
-	  	for (k = 0, l = 0; k < c->mproc; k++) {
+		for (k = 0, l = 0; k < c->mproc; k++) {
 	  
-	  		p = &c->ptable[k]; 
+			p = &c->ptable[k]; 
 
-	    	if(p->state == UNUSED)
-		    	continue;
+			if(p->state == UNUSED)
+				continue;
 
-		 	ci->conts[j].procs[l].pid = p->pid;
-		 	ci->conts[j].procs[l].ticks = p->ticks;
-		 	ci->conts[j].procs[l].state = p->state;		   
-		 	safestrcpy(ci->conts[j].procs[l].name, p->name, sizeof(p->name));			
-		 	l++;		   
-	    }
+			ci->conts[j].procs[l].pid = p->pid;
+			ci->conts[j].procs[l].ticks = p->ticks;
+			ci->conts[j].procs[l].state = p->state;		   
+			safestrcpy(ci->conts[j].procs[l].name, p->name, sizeof(p->name));			
+			l++;		   
+		}
 
-	    j++;
+		j++;
 	}
 	releaseptable();
 
@@ -553,31 +552,31 @@ contdump(void)
 
 	for(i = 0; i < NCONT; i++) {
 
-	  c = &ctable.cont[i];
+		c = &ctable.cont[i];
 
-	  if (c->state == CUNUSED)
-	  	continue;      
+		if (c->state == CUNUSED)
+			continue;      
 
-	  cprintf("\nContainer %d: %s\n", c->cid, c->name);
+		cprintf("\nContainer %d: %s\n", c->cid, c->name);
 
-	  for (k = 0; k < c->mproc; k++) {
-	  
-	  	p = &c->ptable[k]; 
+		for (k = 0; k < c->mproc; k++) {
 
-	    if(p->state == UNUSED)
-		    continue;
-	    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
-	      state = states[p->state];
-	    else
-	      state = "???";
-	    cprintf("\t%d %s %s", p->pid, state, p->name);
-	    if(p->state == SLEEPING){
-	      getcallerpcs((uint*)p->context->ebp+2, pc);
-	      for(j=0; j<10 && pc[j] != 0; j++)
-	        cprintf(" %p", pc[j]);
-	    }
-	    cprintf("\n");
-	  }
+			p = &c->ptable[k]; 
+
+			if(p->state == UNUSED)
+				continue;
+			if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
+				state = states[p->state];
+			else
+				state = "???";
+			cprintf("\t%d %s %s", p->pid, state, p->name);
+			if(p->state == SLEEPING){
+				getcallerpcs((uint*)p->context->ebp+2, pc);
+				for(j=0; j<10 && pc[j] != 0; j++)
+					cprintf(" %p", pc[j]);
+			}
+			cprintf("\n");
+		}
 	}
 
 	releaseptable();
