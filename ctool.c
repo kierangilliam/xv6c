@@ -7,33 +7,30 @@
 
 /* 
 Tests:
-ctool create ctest1 -p 4 sh ps cat echoloop
+ctool create ctest1 -p 4 sh ps echoloop forkbomb
 ctool start ctest1 vc0 sh
 
-ctool create ctest2 -m 40000000 sh df free
+ctool create ctest2 -m 40000000 sh df free membomb
 ctool start ctest2 vc1 sh
 
-ctool create ctest3 -d 100000 sh ps free
+ctool create ctest3 -d 100000 sh ps free diskbomb
 ctool start ctest3 vc2 sh
 
 ctool create ctest4 sh ps echoloop
 ctool start ctest4 vc3 echoloop a b
+
+ctool create ctest5 sh ps free diskbomb
+ctool start ctest5 vc2 sh
 */ 
 
 /* TODO list:     
   Set root msz to max memory, 
     mdsk to max disk (superblock?)  
-  Benson tests
-  ctool auto tests?
 
   cinfo: df/free 
     make max disk and max memory = new function maxmem() and maxdisk()
       min(maxmem(), c->msz)
 
-  1 page talk about how I achieved 
-    isolation for disk, proc, mem
-
-  kfree called too many times
   Rewrite comments on proc.c, comment container.c
   Clean up tab space formatting of modified files
 */
