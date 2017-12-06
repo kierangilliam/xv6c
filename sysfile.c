@@ -467,7 +467,7 @@ sys_cstart(void)
   char *name;
 
   if(argstr(0, &name) < 0) {
-    cprintf("sys_ccreate: Error getting pointers\n");
+    cprintf("sys_cstart: Error getting pointers\n");
     return -1;
   }
   
@@ -488,12 +488,6 @@ sys_cfork(void)
 }
 
 int
-sys_cstop(void)
-{
-  return 1;
-}
-
-int
 sys_cinfo(void)
 {
   struct continfo *ci;
@@ -506,5 +500,38 @@ sys_cinfo(void)
 int
 sys_cpause(void)
 {
-  return 1;
+  char *name;
+
+  if(argstr(0, &name) < 0) {
+    cprintf("sys_cpause: Error getting pointers\n");
+    return -1;
+  }
+  
+  return cpause(name);
+}
+
+int
+sys_cresume(void)
+{
+  char *name;
+
+  if(argstr(0, &name) < 0) {
+    cprintf("sys_cresume: Error getting pointers\n");
+    return -1;
+  }
+  
+  return cresume(name);
+}
+
+int
+sys_cstop(void)
+{
+  char *name;
+
+  if(argstr(0, &name) < 0) {
+    cprintf("sys_cstop: Error getting pointers\n");
+    return -1;
+  }
+  
+  return cstop(name);
 }

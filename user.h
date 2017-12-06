@@ -28,9 +28,10 @@ int getticks(void);
 int ccreate(char*, int, uint, uint);
 int cstart(char*);
 int cfork(int);
-int cstop(void);
 int cinfo(struct continfo*);
-int cpause(void);
+int cpause(char*);
+int cstop(char*);
+int cresume(char*);
 
 // ulib.c
 int stat(char*, struct stat*);

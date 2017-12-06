@@ -109,6 +109,7 @@ extern int sys_cstart(void);
 extern int sys_cfork(void);
 extern int sys_cstop(void);
 extern int sys_cpause(void);
+extern int sys_cresume(void);
 extern int sys_cinfo(void);
 
 static int (*syscalls[])(void) = {
@@ -140,6 +141,7 @@ static int (*syscalls[])(void) = {
 [SYS_cfork] sys_cfork,
 [SYS_cstop] sys_cstop,
 [SYS_cinfo] sys_cinfo,
+[SYS_cresume] sys_cresume,
 };
 
 void
