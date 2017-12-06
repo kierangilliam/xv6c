@@ -1,5 +1,5 @@
 enum procinfostate { PIUNUSED, PIEMBRYO, PISLEEPING, PIRUNNABLE, PIRUNNING, PIZOMBIE };
-enum continfostate { CIUNUSED, CIEMBRYO, CIREADY, CIRUNNABLE, CIPAUSED, CIRUNNING };
+enum continfostate { CIUNUSED, CIEMBRYO, CIREADY, CIRUNNABLE, CIRUNNING, CIPAUSED, CISTOPPING };
 
 // Information of a process
 struct pinfo {

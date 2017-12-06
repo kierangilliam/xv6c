@@ -220,7 +220,7 @@ scheduler(void)
 
       cont = &ctable.cont[i];
 
-      if (cont->state != CRUNNABLE && cont->state != CSTOPPING) // TODO: remove CSTOPPING?
+      if (cont->state != CRUNNABLE && cont->state != CSTOPPING) 
       	continue;                  
 
       for (k = (cont->nextproc % cont->mproc); k < cont->mproc; k++) {
@@ -437,8 +437,6 @@ cfork(int cid)
 int 			 
 ckill(struct cont* c) 
 {
-	cprintf("Killing container %s\n", c->name);
-
 	acquire(&ctable.lock);
 	c->state = CSTOPPING;
 	release(&ctable.lock);
@@ -449,7 +447,6 @@ ckill(struct cont* c)
 static int 
 cexit(struct cont* c)
 {
-	cprintf("Exiting container %s\n", c->name);
 	acquire(&ctable.lock);
 	c->name[0] = 0;
 	c->msz = 0;
@@ -479,7 +476,7 @@ cstop(char* name)
 	if ((c = name2cont(name)) == 0)
 		return -1;
 
-	if (c->state != CRUNNABLE)
+	if (c->state != CRUNNABLE && c->state != CPAUSED)
 		return -1;	
 
 	return ckill(c);
@@ -500,7 +497,7 @@ cpause(char* name)
 
 	if (c->state != CRUNNABLE)
 		return -1;
-	
+
 	acquire(&ctable.lock);
 	c->state = CPAUSED;
 	release(&ctable.lock);

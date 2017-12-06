@@ -27,4 +27,4 @@
 #define SYS_cfork   26
 #define SYS_cinfo    27
 #define SYS_cpause   28
-#define SYS_cresume   28
+#define SYS_cresume   29

@@ -506,7 +506,7 @@ sys_cpause(void)
     cprintf("sys_cpause: Error getting pointers\n");
     return -1;
   }
-  
+
   return cpause(name);
 }
 

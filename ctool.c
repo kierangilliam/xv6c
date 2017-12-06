@@ -21,7 +21,6 @@ ctool start ctest4 vc3 echoloop a b
 */ 
 
 /* TODO list:     
-  cpause, cresume, cstop  
   ps
   Set root msz to max memory, 
     mdsk to max disk (superblock?)  
@@ -186,7 +185,7 @@ pause(int argc, char *argv[])
   if (argc < 2)
     usage("ctool pause <name>");
   
-  if (cpause(argv[2]))
+  if (cpause(argv[2]) == 1)
     printf(1, "Paused %s\n", argv[2]);
   else
     printf(1, "ctool: pause failed\n");
@@ -198,7 +197,7 @@ resume(int argc, char *argv[])
   if (argc < 2)
     usage("ctool resume <name>");
   
-  if (cresume(argv[2]))
+  if (cresume(argv[2]) == 1)
     printf(1, "Resumed %s\n", argv[2]);
   else
     printf(1, "ctool: resume failed\n");
@@ -210,7 +209,7 @@ stop(int argc, char *argv[])
   if (argc < 2)
     usage("ctool stop <name>");
   
-  if (cstop(argv[2]))
+  if (cstop(argv[2]) == 1)
     printf(1, "Stopped %s\n", argv[2]);
   else
     printf(1, "ctool: stop failed\n");
@@ -234,6 +233,16 @@ info()
     [PIZOMBIE]    "zombie"
     };
 
+  static char *cstates[] = {
+    [CIUNUSED]    "unused",
+    [CIEMBRYO]    "embryo",
+    [CIREADY]     "ready ",
+    [CIRUNNABLE]  "runnable",
+    [CIRUNNING]   "running",
+    [CIPAUSED]    "paused",   
+    [CISTOPPING]  "stopping"  
+    };    
+
   numstates = 6;
 
   ci = malloc(sizeof(*ci));
@@ -256,9 +265,6 @@ info()
     }  
   }
 
-  /*
-  TODO: The execution statistics and percent of CPU consumed by each process and each container
-  */
   for (i = 0; i < NCONT; i++) {
     c = ci->conts[i];
     if (c.state == CIUNUSED) 
@@ -273,7 +279,7 @@ info()
       contticks += p.ticks;
     }      
 
-    printf(1, "Container %d: %s (/%s)\n", c.cid, c.name, c.name);
+    printf(1, "Container %d: %s (/%s) %s\n", c.cid, c.name, c.name, cstates[c.state]);
     printf(1, "\tExecuted %d%% (%d/%d) of the time\n", contticks*100/totalticks, contticks, totalticks);
     printf(1, "\t\tUsed\tAvailable\n");
     printf(1, "\tProc: \t%d\t%d\n\tMem: \t%dkb\t%dmb\n\tDisk: \t%dkb\t%dmb\n", 
