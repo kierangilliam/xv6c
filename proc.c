@@ -28,8 +28,7 @@ myproc(void) {
   return p;
 }
 
-//PAGEBREAK: 32
-// Look in the process table for an UNUSED proc.
+// Look in the parentcont's process table for an UNUSED proc.
 // If found, change state to EMBRYO and initialize
 // state required to run in the kernel.
 // Otherwise return 0.
@@ -90,9 +89,7 @@ found:
   return p;
 }
 
-// Set up first user process for a given container.
-// If this is not the first root process, exec will
-// set the sz and pgdir for the initialized process
+// Set up first user process for initial root container.
 struct proc*
 initprocess(struct cont* parentcont)
 {  
@@ -158,7 +155,10 @@ growproc(int n)
   return 0;
 }
 
-// Create a new process copying p as the parent.
+// If there is a parent cont
+// Set new processes cwd, cont, and parent to be
+// parentcont's rootdir, rootdir, and initproc.
+// Else, create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
 // Pass in 0 to exactly fork current process
