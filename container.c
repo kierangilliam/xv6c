@@ -62,22 +62,12 @@ cinit(void)
   initlock(&ptable.lock, "ptable");
 }
 
-void
-acquirectable(void) 
-{
-	acquire(&ptable.lock);
-}
-// TODO: refactor name of ctablelock to ptable
-// TODO: replace these aqcuires and releases with normal aqcuire and release using ctablelock()
-void 
-releasectable(void)
-{
-	release(&ptable.lock);
-	//cprintf("\t\t Released ctable\n");
-}
+void acquireptable(void) { acquire(&ptable.lock); }
+
+void releaseptable(void) { release(&ptable.lock); }
 
 struct spinlock*
-ctablelock(void)
+ptablelock(void)
 {
 	return &ptable.lock;
 }
@@ -86,7 +76,7 @@ struct cont*
 initcontainer(void)
 {
 	int i,
-		mproc = MAX_CONT_PROC,
+		mproc = NPROC,
 		msz   = MAX_CONT_MEM,
 		mdsk  = MAX_CONT_DSK;
 	struct cont *c;
@@ -127,12 +117,6 @@ userinit(void)
 	struct cont* root;
   	root = initcontainer();
   	initprocess(root);    	
-}
-
-//TODO: REMOVE!!
-struct cont*
-mycont(void) {
-	return currcont;
 }
 
 // Look in the container table for an CUNUSED cont.
@@ -193,7 +177,7 @@ sched(void)
   int intena;
   struct proc *p = myproc();
 
-  if(!holding(ctablelock()))
+  if(!holding(ptablelock()))
     panic("sched ptable.lock");
   if(mycpu()->ncli != 1) 
     panic("sched locks");
@@ -227,7 +211,7 @@ scheduler(void)
     sti();
 
     // Loop over process table looking for process to run.
-    acquire(&ptable.lock);
+    acquireptable();
     // TODO: do we need to acquire ctable lock too?
 
     for(i = 0; i < NCONT; i++) {
@@ -261,7 +245,7 @@ scheduler(void)
 	      c->proc = 0;
 	  }
     }
-    release(&ptable.lock);
+    releaseptable();
 
   }
 }
@@ -305,7 +289,7 @@ ccreate(char* name, int mproc, uint msz, uint mdsk)
 	if (name2cont(name))
 		return -1;
 
-	if (mproc > MAX_CONT_PROC || msz > MAX_CONT_MEM || mdsk > MAX_CONT_DSK)
+	if (mproc > NPROC || msz > MAX_CONT_MEM || mdsk > MAX_CONT_DSK)
 		return -1;
 
 	// Allocate container.
@@ -339,6 +323,8 @@ cstart(char* name)
 {		
 	struct cont *nc;
 	int i;
+	struct inode* rootdir;
+	uint udsk, mdsk;
 	
 	acquire(&ctable.lock);
 
@@ -353,8 +339,27 @@ cstart(char* name)
 	return -1;
 
 found: 	
-	// TODO: Walk containers directory to see available memory, set c->ubl to that if its not over its limit
 
+	/*
+	TODO: Check left space and disk and proc
+	total = 220mb
+	root = 150mb
+	c1max = 120mb
+	c1max = c1max - (total - root)
+	*/
+
+	rootdir = nc->rootdir;
+	mdsk = nc->mdsk;
+
+	release(&ctable.lock);	
+
+	// Get current memory used in container folder
+	udsk = dirsize(rootdir, name);
+	if((udsk) < 1 || mdsk < udsk)
+	    return -1;
+
+	acquire(&ctable.lock);
+    nc->udsk = udsk;
 	nc->state = CRUNNABLE;	
 	release(&ctable.lock);	
 	return nc->cid;
@@ -371,7 +376,7 @@ cinfo(struct continfo* ci)
 
 	ci->root = myproc()->cont->cid == ROOTCONT;
 
-	acquirectable();
+	acquireptable();
 	for(i = 0; i < NCONT; i++) {
 
 		c = &ctable.cont[i];
@@ -385,7 +390,7 @@ cinfo(struct continfo* ci)
 		ci->conts[j].mdsk = c->mdsk;
 		ci->conts[j].mproc = c->mproc;
 		ci->conts[j].usz = c->upg * PGSIZE;
-		ci->conts[j].udsk = c->ubl * BSIZE;
+		ci->conts[j].udsk = c->udsk;
 		ci->conts[j].cid = c->cid;		
 		ci->conts[j].state = c->state;
 		safestrcpy(ci->conts[j].name, c->name, sizeof(c->name));			
@@ -397,9 +402,8 @@ cinfo(struct continfo* ci)
 	    	if(p->state == UNUSED)
 		    	continue;
 
-		 	ci->conts[j].procs[l].pid = l;	 // TODO: Change?	   
+		 	ci->conts[j].procs[l].pid = p->pid;
 		 	ci->conts[j].procs[l].ticks = p->ticks;
-		 	cprintf("%s ticks %d\n", p->name, p->ticks);
 		 	ci->conts[j].procs[l].state = p->state;		   
 		 	safestrcpy(ci->conts[j].procs[l].name, p->name, sizeof(p->name));			
 		 	l++;		   
@@ -407,7 +411,7 @@ cinfo(struct continfo* ci)
 
 	    j++;
 	}
-	releasectable();
+	releaseptable();
 
 	return 1;
 }
@@ -435,11 +439,19 @@ ckill(struct cont* c)
 int 
 cpause(int cid)
 {
+	// Check if root
 	// Save its old state to resume on cresume
 	return 1;
 }
 
-//PAGEBREAK: 36
+int 
+cresume(int cid)
+{
+	// Check if root
+	// Save its old state to resume on cresume
+	return 1;
+}
+
 // Print a process listing of current container to console.  For debugging.
 // Runs when user types ^P on console.
 // No lock to avoid wedging a stuck machine further.
@@ -461,7 +473,7 @@ contdump(void)
 	char *state;
 	uint pc[10];
 
-	acquirectable();
+	acquireptable();
 
 	for(i = 0; i < NCONT; i++) {
 
@@ -492,5 +504,5 @@ contdump(void)
 	  }
 	}
 
-	releasectable();
+	releaseptable();
 }

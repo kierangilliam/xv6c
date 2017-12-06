@@ -30,7 +30,7 @@ main(int argc, char *argv[])
 			continue;
 
 		printf(1, "Container %d: %s\n", c.cid, c.name);
-		printf(1, "\tDisk: %dkb/%dkb/%dmb (Used/ Available/ Max)\n", c.udsk/1024, (c.mdsk/1024 - c.udsk/1024), c.mdsk/1024/1024);
+		printf(1, "\tDisk: %dkb/%dkb/%dkb (Used/ Available/ Max)\n", c.udsk/1024, (c.mdsk/1024 - c.udsk/1024), c.mdsk/1024);
 	}
 
 	exit();

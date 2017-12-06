@@ -64,8 +64,8 @@ balloc(uint dev)
   c = myproc()->cont;
 
   // Can container allocate more blocks?
-  if((c->ubl * BSIZE + BSIZE) > c->mdsk) {
-      cprintf("Killing container %d for trying to allocate %d * %d + %d disk space.\n", myproc()->cont->cid, c->ubl,PGSIZE,PGSIZE);
+  if((c->udsk + BSIZE) > c->mdsk) {
+      cprintf("Killing container %d for trying to allocate %d + %d disk space.\n", myproc()->cont->cid, c->udsk, BSIZE);
       ckill(myproc()->cont);
       return 0;
   }  
@@ -80,7 +80,7 @@ balloc(uint dev)
         log_write(bp);
         brelse(bp);
         bzero(dev, b + bi);
-        c->ubl++;
+        c->udsk += BSIZE;
         return b + bi;
       }
     }
@@ -99,8 +99,8 @@ bfree(int dev, uint b)
 
   c = myproc()->cont;
 
-  if (c->ubl > 0)
-    c->ubl--;
+  if (c->udsk > BSIZE)
+    c->udsk -= BSIZE;
 
   readsb(dev, &sb);
   bp = bread(dev, BBLOCK(b, sb));
@@ -596,6 +596,42 @@ dirlink(struct inode *dp, char *name, uint inum)
   return 0;
 }
 
+// Returns directory size in bytes
+uint 
+dirsize(struct inode *dp, char *name)
+{
+  int off;
+  struct dirent de;
+  struct inode *ip;
+  char path[512]; 
+  uint size;
+
+  size = 0;
+
+  // Check that name is present.
+  if(dirlookup(dp, name, 0))
+    return -1;
+
+  // Use dirent names to make absolute path to
+  for(off = 0; off < dp->size; off += sizeof(de)){
+    if(readi(dp, (char*)&de, off, sizeof(de)) != sizeof(de))
+      panic("dirsize read");
+
+    memmove(path, name, strlen(name));
+    memmove(path + strlen(name), "/", 1);
+    memmove(path + strlen(name) + 1, de.name, strlen(de.name));
+    memmove(path + strlen(name) + 1 + strlen(de.name), "\0", 1);
+
+    if((ip = namei(path)) && ip->inum != ROOTINO && ip->inum != dp->inum){
+      ilock(ip);
+      size += ip->size;      
+      iunlock(ip);
+    }
+  }
+    
+  return size;
+}
+
 //PAGEBREAK!
 // Paths
 
@@ -647,9 +683,6 @@ namex(char *path, int nameiparent, char *name)
 
   iroot = iget(ROOTDEV, ROOTINO);
   
-  // cprintf("namex begin %s with proc %s \n", path, ((myproc() == 0) ? "null" : myproc()->name));
-  // cprintf("\tiroot is type folder %d\n", (iroot->type == T_DIR));    
-
   // Absolute or relative
   if (myproc() == 0)
     ip = iroot;
@@ -657,39 +690,28 @@ namex(char *path, int nameiparent, char *name)
     ip = idup(myproc()->cont->rootdir);
   else {    
     ip = idup(myproc()->cwd);    
-    // cprintf("\tip = myproc's cwd (which is also it's container) %d\n", (myproc()->cwd->inum == myproc()->cont->rootdir->inum));
-    // cprintf("\tip is type folder %d\n", (ip->type == T_DIR));    
-    // cprintf("\trootdir is type folder %d\n", (myproc()->cont->rootdir->type == T_DIR));    
-    // TODO: to find out: Root dir for namei('/') is NOT a dir.. why?
   }
 
   while((path = skipelem(path, name)) != 0){
-    //cprintf("\there0\n");
     ilock(ip);
-    //cprintf("\there1\n");
     if(ip->type != T_DIR){
       iunlockput(ip);
       return 0;
     }
-    //cprintf("\there2\n");
     if(nameiparent && *path == '\0'){
       // Stop one level early.
       iunlock(ip);
       return ip;
     }
-    //cprintf("\there3\n");
     if((next = dirlookup(ip, name, 0)) == 0){
       iunlockput(ip);
       return 0;
     }    
-    //cprintf("\there4\n");
     iunlockput(ip);
     
     // If myproc is running in root container, 
     // or the above (next) folder is not the root folder,
     // then set ip = next
-    // TODO: validate that this works
-    // cprintf("we are root: %d \nwe're not trying to acces something in root: %d\n", myproc()->cont->rootdir->inum == iroot->inum, next->inum != iroot->inum);
     if (myproc()->cont->rootdir->inum == iroot->inum || next->inum != iroot->inum)
       ip = next;
   }
@@ -697,8 +719,6 @@ namex(char *path, int nameiparent, char *name)
     iput(ip);
     return 0;
   }
-  // cprintf("\treturning ip\n");
-  // cprintf("\tip is a folder? %d\n", (ip->type == T_DIR));
   return ip;
 }
 

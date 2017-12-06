@@ -41,7 +41,7 @@ allocproc(struct cont *parentcont)
   struct proc *ptable;
   int nproc;
 
-  acquirectable();
+  acquireptable();
 
   ptable = parentcont->ptable;
   nproc = parentcont->mproc;
@@ -50,14 +50,14 @@ allocproc(struct cont *parentcont)
     if(p->state == UNUSED)
       goto found;  
 
-  releasectable();
+  releaseptable();
   return 0;
 
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;  
 
-  releasectable();  
+  releaseptable();  
 
   // Allocate kernel stack.
   if((p->kstack = kalloc()) == 0){
@@ -123,11 +123,11 @@ initprocess(struct cont* parentcont)
   // run this process. the acquire forces the above
   // writes to be visible, and the lock is also needed
   // because the assignment might not be atomic.
-  acquirectable();
+  acquireptable();
 
   p->state = RUNNABLE;
 
-  releasectable();
+  releaseptable();
 
   return p;
 }
@@ -205,9 +205,9 @@ fork(struct cont* parentcont)
 
   pid = np->pid;
 
-  acquirectable();
+  acquireptable();
   np->state = RUNNABLE;
-  releasectable();
+  releaseptable();
 
   return pid;
 }
@@ -239,7 +239,7 @@ exit(void)
   end_op();
   curproc->cwd = 0;
 
-  acquirectable();
+  acquireptable();
 
   ptable = curproc->cont->ptable;
   nproc = curproc->cont->mproc;
@@ -272,7 +272,7 @@ wait(void)
   int havekids, pid, nproc;
   struct proc *curproc = myproc();
   
-  acquirectable();
+  acquireptable();
 
   ptable = curproc->cont->ptable;
   nproc = curproc->cont->mproc;
@@ -295,19 +295,19 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
-        releasectable();
+        releaseptable();
         return pid;
       }
     }
 
     // No point waiting if we don't have any children.
     if(!havekids || curproc->killed){
-      releasectable();
+      releaseptable();
       return -1;
     }
 
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
-    sleep(curproc, ctablelock());  //DOC: wait-sleep
+    sleep(curproc, ptablelock());  //DOC: wait-sleep
   }
 }
 
@@ -315,10 +315,10 @@ wait(void)
 void
 yield(void)
 {
-  acquirectable();  //DOC: yieldlock
+  acquireptable();  //DOC: yieldlock
   myproc()->state = RUNNABLE;
   sched();
-  releasectable();
+  releaseptable();
 }
 
 // A fork child's very first scheduling by scheduler()
@@ -328,7 +328,7 @@ forkret(void)
 {
   static int first = 1;
   // Still holding ctablelock from scheduler.
-  releasectable();
+  releaseptable();
 
   if (first) {    
     // Some initialization functions must be run in the context
@@ -361,8 +361,8 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup runs with ctable.lock locked),
   // so it's okay to release lk.
-  if(lk != ctablelock()){  //DOC: sleeplock0
-    acquirectable();  //DOC: sleeplock1
+  if(lk != ptablelock()){  //DOC: sleeplock0
+    acquireptable();  //DOC: sleeplock1
     release(lk);
   }
   // Go to sleep.
@@ -375,8 +375,8 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = 0;
 
   // Reacquire original lock.
-  if(lk != ctablelock()){  //DOC: sleeplock2
-    releasectable();
+  if(lk != ptablelock()){  //DOC: sleeplock2
+    releaseptable();
     acquire(lk);
   }
 }
@@ -385,9 +385,9 @@ sleep(void *chan, struct spinlock *lk)
 void
 wakeup(void *chan)
 {
-  acquirectable();
+  acquireptable();
   wakeup1(chan);
-  releasectable();
+  releaseptable();
 }
 
 // Kill the process with the given pid.
@@ -400,7 +400,7 @@ kill(int pid)
   struct proc *ptable;
   int nproc;
 
-  acquirectable();
+  acquireptable();
 
   ptable = myproc()->cont->ptable;
   nproc = myproc()->cont->mproc;
@@ -411,10 +411,10 @@ kill(int pid)
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING)
         p->state = RUNNABLE;
-      releasectable();
+      releaseptable();
       return 0;
     }
   }
-  releasectable();
+  releaseptable();
   return -1;
 }

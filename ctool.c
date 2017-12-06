@@ -8,27 +8,32 @@
 /* 
 Tests:
 ctool create ctest1 -p 4 sh ps cat echoloop
-ctool start ctest1 vc0 echoloop 10 ab
-(40,000,000)
+ctool start ctest1 vc0 sh
+
 ctool create ctest2 -m 40000000 sh df free
 ctool start ctest2 vc0 sh
+
+ctool create ctest3 -d 100000 sh ps free
+ctool start ctest3 vc1 sh
+
+ctool create ctest4 sh ps echoloop
+ctool start ctest4 vc2 echoloop a b
 */ 
 
 /* TODO list: 
-  df - disk space
-  cinfo
+  1 page talk about how I achieved 
+    isolation for disk, proc, mem
+  ctool auto tests?
   ps
   cpause, cresume, cstop
+  More than 2 consoles
   Set root mproc to NPROC, 
     msz to max memory, 
-    mdsk to max disk (superblock?)
-  Fair scheduling
-  More than 2 consoles
+    mdsk to max disk (superblock?)  
+  Add more blocks?
   kfree called too many times
-  ticks not tracking properly
   Rewrite comments on proc.c, comment container.c
   Clean up tab space formatting of modified files
-  Execute commands inside kernel (cfork and such)
 */
 
 void 
@@ -84,7 +89,7 @@ void
 create(int argc, char *argv[])
 {
   int i, k, last_flag = 2, // No flags
-  mproc = MAX_CONT_PROC, 
+  mproc = NPROC, 
   msz = MAX_CONT_MEM, 
   mdsk = MAX_CONT_DSK;  
 
@@ -247,7 +252,7 @@ info()
     }      
 
     printf(1, "Container %d: %s (/%s)\n", c.cid, c.name, c.name);
-    printf(1, "\tExecuted %d%% (%d/%d) of the time\n", (contticks/totalticks*100), contticks, totalticks);
+    printf(1, "\tExecuted %d%% (%d/%d) of the time\n", contticks*100/totalticks, contticks, totalticks);
     printf(1, "\t\tUsed\tAvailable\n");
     printf(1, "\tProc: \t%d\t%d\n\tMem: \t%dkb\t%dmb\n\tDisk: \t%dkb\t%dmb\n", 
       uproc, c.mproc, c.usz/1024, c.msz/1024/1024, c.udsk/1024, c.mdsk/1024/1024);
@@ -265,7 +270,7 @@ info()
       else
         state = "???";
 
-      printf(1, "\t\t%d %s %s \t(%d%% CPU time)\n", p.pid, state, p.name, p.ticks/totalticks*100);
+      printf(1, "\t\t%d %s %s \t(%d%% CPU time)\n", p.pid, state, p.name, (100*p.ticks/totalticks));
     } 
     printf(1, "\n");
   }

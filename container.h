@@ -22,7 +22,7 @@ struct cont {
 	uint mdsk;					// Max amount of disk space (bytes)
 	int mproc;					// Max amount of processes	
 	int upg;					// Used pages of memory
-	uint ubl;					// Used disk space (blocks)
+	uint udsk;					// Used disk space (blocks)
 	int cid;					// Container ID
 	struct inode *rootdir;		// Root directory
 	enum contstate state;		// State of container
