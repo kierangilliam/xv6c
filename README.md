@@ -3,7 +3,7 @@ xv6c
 
 xv6c aims to containerize xv6 to provide resource and process isolation. Containers can be manipulated with the administrative user level program `ctool`. Containers ensure that processes not inside the root container can touch other processes (for example, piping and killing). Further, a process running in folder `X` cannot access memory outside of its folder. xv6c also ensures that containers don't exceed their resource limits. If they do, they are killed.
 
-----------
+
 Usage
 -------------
 #### Creating a container:
@@ -18,7 +18,7 @@ The user gives a name of a container to run. The user also specifies what virtua
 		ctool (pause || resume || stop) <name>
 The user can pause, resume, or stop a given container. Pausing and resuming toggles whether or not a container can run. Stopping kills a container and all of its processes. 
 
-----------
+
 
 Process and Resource Isolation
 -------------------
@@ -32,7 +32,7 @@ Containers track the amount of memory and disk space used by counting the number
 
 > **Disk Isolation: Namex()** Disk access is restricted in `fs.c` with the method `namex()`. When traversing the provided path, `namex()` ensures that no non-root containers can access the root `inode`. Any attempts are ignored and default to staying inside of the container's top level directory.
 
-----------
+
 
 Future Changes
 -------------
