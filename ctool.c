@@ -20,17 +20,6 @@ ctool create ctest4 sh ps echoloop
 ctool start ctest4 vc3 echoloop a b
 */ 
 
-/* TODO list:     
-	Set root msz to max memory, 
-		mdsk to max disk (superblock?)  
-
-	cinfo: df/free 
-		make max disk and max memory = new function maxmem() and maxdisk()
-			min(maxmem(), c->msz)
-
-	Clean up tab space formatting of modified files
-*/
-
 void 
 usage(char* usage) 
 {
