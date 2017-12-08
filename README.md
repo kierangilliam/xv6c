@@ -26,14 +26,14 @@ Process and Resource Isolation
 Each container has their own isolated process table. This implementation choice allowed me to leave  `proc.c` largely unaltered. In xv6c, processes are seen as a subclass of containers. Because of this, processes have no way of interacting (i.e. piping to or killing) with other processes. The xv6 process scheduler has been modified to run Round Robin on containers instead of processes. This ensures containers are scheduled evenly, despite the differing amount of processes they own.
 >**Note:** Even the root container cannot touch other container's processes. To kill a process, the root must kill an entire container. 
 
->**Namespaces** 
+>**Namespaces:** 
 >Because processes have no way of interacting with other containers, I decided not to create local, per container, namespacing. The benefit to this approach is not having to add more complexity to the kernel. However, the trade-off is that containers are aware of the possibility of other processes. An argument against this approach is that containers should not be aware of anything outside of its own scope.
 
 #### Memory and Disk
 Containers track the amount of memory and disk space used by counting the number of pages or blocks allocated and freed. In `kalloc()`, a container's used pages variable, `upg`, is incremented. In `kfree()`, it is decremented. `balloc()` and `bfree()` do the same but, instead, track the container's used disk variable `udsk`. Containers are killed if they try to allocate more resources than their allowance set in `ccreate()`. 
 >**Note:** A more elegant approach may be to sleep the process trying to allocate over the resource limits until resources are freed by a different process in the container.
 
-> **Disk Isolation: Namex()** 
+> **Disk Isolation: Namex():** 
 > Disk access is restricted in `fs.c` with the method `namex()`. When traversing the provided path, `namex()` ensures that no non-root containers can access the root `inode`. Any attempts are ignored and default to staying inside of the container's top level directory.
 
 
