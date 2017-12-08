@@ -125,7 +125,7 @@ start(int argc, char *argv[])
     	usage("ctool start <name> <vc> prog arg1 [arg2 ...]");
 
     if ((vc = open(argv[3], O_RDWR)) == -1) {
-    	printf(1, "Couldn't open virtual console %s", argv[3]);
+    	printf(1, "Couldn't open virtual console %s\n", argv[3]);
     	exit();
     } 
 

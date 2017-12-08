@@ -4,6 +4,7 @@
 #include "stat.h"
 #include "user.h"
 #include "fcntl.h"
+#include "param.h"
 
 char *argv[] = { "sh", 0 };
 
@@ -13,7 +14,7 @@ create_vcs(void)
   int i, fd;
   char *dname = "vc0";
 
-  for (i = 0; i < 4; i++) {
+  for (i = 0; i < NCONT; i++) {
     dname[2] = '0' + i;
     if ((fd = open(dname, O_RDWR)) < 0){
       mknod(dname, 1, i + 2);

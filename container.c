@@ -196,7 +196,7 @@ scheduler(void)
 	struct proc *p;
 	struct cont *cont;
 	struct cpu *c = mycpu();
-	int i, k;
+	int i;
 	c->proc = 0;
 
 	for(;;){
@@ -213,41 +213,42 @@ scheduler(void)
 			if (cont->state != CRUNNABLE && cont->state != CSTOPPING) 
 				continue;                  
 
-			for (k = (cont->nextproc % cont->mproc); k < cont->mproc; k++) {
+			p = &cont->ptable[cont->nextproc];       	  
 
-				p = &cont->ptable[k];       	  
+			cont->nextproc = cont->nextproc + 1;
 
-				cont->nextproc = cont->nextproc + 1;
+			if (cont->nextproc == cont->mproc)
+				cont->nextproc = 0;
 
-				if(p->state != RUNNABLE)
-					continue;
+			if(p->state != RUNNABLE)
+				continue;
 
-				// Kill processes
-				if (cont->state == CSTOPPING) {
-					p->killed = 1;
-					// Wake process from sleep if necessary.
-					if(p->state == SLEEPING)
-						p->state = RUNNABLE;
-				}
-
-				// Switch to chosen process.  It is the process's job
-				// to release ctable.lock and then reacquire it
-				// before jumping back to us.
-				c->proc = p;
-				switchuvm(p);
-				p->state = RUNNING;
-
-				swtch(&(c->scheduler), p->context); 
-				switchkvm();
-
-				// Process is done running for now.
-				// It should have changed its p->state before coming back.
-				c->proc = 0;
-			  
-				// Check if all processes are exited
-				if (cont->uproc == 0)	 
-					cexit(cont);
+			// Kill processes
+			if (cont->state == CSTOPPING) {
+				p->killed = 1;
+				// Wake process from sleep if necessary.
+				if(p->state == SLEEPING)
+					p->state = RUNNABLE;
 			}
+
+			// Switch to chosen process.  It is the process's job
+			// to release ctable.lock and then reacquire it
+			// before jumping back to us.
+			c->proc = p;
+			switchuvm(p);
+			p->state = RUNNING;
+
+			swtch(&(c->scheduler), p->context); 
+			switchkvm();
+
+			// Process is done running for now.
+			// It should have changed its p->state before coming back.
+			c->proc = 0;
+		  
+			// Check if all processes are exited
+			if (cont->uproc == 0)	 
+				cexit(cont);
+			
 		}
 		releaseptable();
 	}

@@ -31,8 +31,6 @@ static int panicked = 0;
 
 static int active = 1;
 
-struct input buf1 = {"", 0, 0, 0};
-struct input buf2 = {"", 0, 0, 0};
 struct input buffers[NCONT];
 
 static struct {
